@@ -1,0 +1,145 @@
+@import 'tailwindcss';
+
+/*
+ * Chế độ tối bật bằng class .dark trên <html> thay vì chỉ theo cài đặt hệ
+ * điều hành, để người dùng tự chuyển được. Xem lib/theme.ts.
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Token ngữ nghĩa theo DESIGN.md. Đặt tên theo VAI TRÒ chứ không theo màu:
+ * `surface` giữ nguyên ý nghĩa ở cả chế độ sáng lẫn tối, còn `zinc-900` thì
+ * không. Nhờ vậy chuyển chế độ chỉ cần đổi giá trị biến ở một chỗ.
+ */
+@theme {
+  --color-canvas: #fafafa;
+  --color-surface: #ffffff;
+  --color-sunken: #f4f4f5;
+  --color-ink: #18181b;
+  --color-ink-muted: #71717a;
+  --color-line: #e4e4e7;
+  --color-accent: #d9482b;
+  --color-accent-soft: #fdf0ec;
+  --color-accent-ink: #ffffff;
+
+  --font-sans: 'Be Vietnam Pro', ui-sans-serif, system-ui, sans-serif;
+  /* Serif display cho không khí premium — chỉ dùng ở tiêu đề lớn, cấm dùng cho chữ thân. */
+  --font-serif: 'Playfair Display', Georgia, serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  /*
+   * Góc vuông gần như phẳng theo hướng sàn TMĐT (Shopee ~2-4px): panel và
+   * control chỉ bo 4px cho đỡ sắc cạnh. Chỉ avatar, nút icon tròn và badge
+   * nhỏ còn được phép rounded-full.
+   */
+  --radius-card: 0.25rem;
+  --radius-control: 0.25rem;
+
+  --ease-snap: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-enter: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.dark {
+  --color-canvas: #09090b;
+  --color-surface: #18181b;
+  --color-sunken: #27272a;
+  --color-ink: #fafafa;
+  --color-ink-muted: #a1a1aa;
+  --color-line: #27272a;
+  /* Sáng hơn bản ngày để đủ tương phản trên nền đen. */
+  --color-accent: #f26b4d;
+  --color-accent-soft: #2a1410;
+  --color-accent-ink: #18181b;
+}
+
+@layer base {
+  html {
+    color-scheme: light;
+  }
+
+  html.dark {
+    color-scheme: dark;
+  }
+
+  body {
+    background-color: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: 0.875rem;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Giá tiền và số lượng thẳng cột để mắt so sánh theo hàng dọc. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /*
+   * Quy tắc chống lag số 4: người bật chế độ giảm chuyển động thì tắt sạch,
+   * kể cả hai vòng lặp vô hạn của banner và badge flash sale.
+   */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer utilities {
+  /*
+   * Quy tắc chống lag số 2: trình duyệt bỏ qua việc dựng thẻ nằm ngoài màn
+   * hình. contain-intrinsic-size giữ chỗ đúng chiều cao để thanh cuộn không
+   * nhảy khi thẻ được dựng thật. 420px vì thẻ ảnh dọc 4:5 cao hơn thẻ vuông.
+   */
+  .card-defer {
+    content-visibility: auto;
+    contain-intrinsic-size: 420px;
+  }
+
+  /*
+   * Nhãn khối kiểu tiệm thời trang: VIẾT HOA, giãn chữ, cỡ nhỏ đậm.
+   * Xem DESIGN.md mục 3 — đây là chữ ký thị giác của bản 2.
+   */
+  .label-block {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  /*
+   * Menu thả từ avatar: hiện ra bằng trượt nhẹ + mờ dần trong 160ms.
+   * Chỉ animate transform/opacity — quy tắc chống lag số 1 của DESIGN.md.
+   */
+  .menu-pop {
+    animation: menu-pop 160ms var(--ease-snap);
+  }
+
+  @keyframes menu-pop {
+    from {
+      opacity: 0;
+      transform: translateY(-4px);
+    }
+  }
+
+  /* Hàng chip cuộn ngang không hiện thanh cuộn (vẫn cuộn được). */
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+  }
+}

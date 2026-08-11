@@ -1,0 +1,34 @@
+{
+  "name": "agentchuan-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -b --noEmit",
+    "validate:components": "node scripts/validate-components.mjs",
+    "postinstall": "npm --prefix scripts/openapi-contract ci",
+    "api:generate": "npm --prefix scripts/openapi-contract run generate",
+    "api:check": "npm --prefix scripts/openapi-contract run check && node scripts/check-admin-api-boundaries.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.101.4",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "react-router-dom": "^7.18.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.4",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^7.0.2",
+    "vite": "^8.1.5"
+  }
+}

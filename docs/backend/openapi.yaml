@@ -1,0 +1,498 @@
+openapi: 3.1.0
+info:
+  title: AgentChuan Admin API
+  version: 0.4.0
+  description: Source-of-truth transport contract for SPEC-BE-001 v0.3 and SPEC-FE-002 v0.2.
+servers:
+  - url: http://localhost:4000/api
+security:
+  - accessCookie: []
+components:
+  securitySchemes:
+    accessCookie: { type: apiKey, in: cookie, name: access_token }
+  schemas:
+    OrderStatus: { type: string, enum: [PENDING, CONFIRMED, SHIPPING, DELIVERED, CANCELLED] }
+    PaymentStatus: { type: string, enum: [UNPAID, PAID, FAILED] }
+    PaymentMethod: { type: string, enum: [COD, MOMO] }
+    Role: { type: string, enum: [USER, ADMIN] }
+    ActorType: { type: string, enum: [CUSTOMER, ADMIN, SYSTEM] }
+    Pagination:
+      type: object
+      required: [page, limit, total, totalPages]
+      properties:
+        page: { type: integer }
+        limit: { type: integer }
+        total: { type: integer }
+        totalPages: { type: integer }
+    Category:
+      type: object
+      required: [id, name, slug, sortOrder, productCount, children]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        slug: { type: string }
+        sortOrder: { type: integer }
+        productCount: { type: integer }
+        children: { type: array, items: { $ref: '#/components/schemas/Category' } }
+    CreateCategoryInput:
+      type: object
+      additionalProperties: false
+      required: [name]
+      properties:
+        name: { type: string }
+        parentId: { type: [integer, 'null'] }
+        sortOrder: { type: integer }
+    UpdateCategoryInput:
+      type: object
+      additionalProperties: false
+      properties:
+        name: { type: string }
+        parentId: { type: [integer, 'null'] }
+        sortOrder: { type: integer }
+    ProductImage:
+      type: object
+      required: [id, url, thumbUrl, sortOrder]
+      properties:
+        id: { type: integer }
+        url: { type: string }
+        thumbUrl: { type: string }
+        sortOrder: { type: integer }
+    ProductSummary:
+      type: object
+      required: [id, name, slug, price, stock, isActive, createdAt, category, images]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        slug: { type: string }
+        price: { type: integer }
+        stock: { type: integer }
+        isActive: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        category:
+          type: object
+          required: [id, name, slug]
+          properties: { id: { type: integer }, name: { type: string }, slug: { type: string } }
+        images:
+          type: array
+          items:
+            type: object
+            required: [url, thumbUrl]
+            properties: { url: { type: string }, thumbUrl: { type: string } }
+    ProductDetail:
+      allOf:
+        - $ref: '#/components/schemas/ProductSummary'
+        - type: object
+          required: [description, variants]
+          properties:
+            description: { type: string }
+            images: { type: array, items: { $ref: '#/components/schemas/ProductImage' } }
+            variants:
+              type: array
+              items:
+                type: object
+                required: [id, size, color, stock]
+                properties:
+                  id: { type: integer }
+                  size: { type: string }
+                  color: { type: string }
+                  stock: { type: integer }
+    NewVariantInput:
+      type: object
+      additionalProperties: false
+      required: [size, color, initialStock]
+      properties:
+        size: { type: string, maxLength: 20 }
+        color: { type: string, maxLength: 50 }
+        initialStock: { type: integer, minimum: 0, maximum: 100000 }
+    ExistingVariantInput:
+      type: object
+      additionalProperties: false
+      required: [id, size, color]
+      properties:
+        id: { type: integer, minimum: 1 }
+        size: { type: string, maxLength: 20 }
+        color: { type: string, maxLength: 50 }
+    CreateProductInput:
+      type: object
+      additionalProperties: false
+      required: [name, description, price, categoryId, variants]
+      properties:
+        name: { type: string }
+        description: { type: string }
+        price: { type: integer }
+        categoryId: { type: integer }
+        isActive: { type: boolean }
+        variants: { type: array, minItems: 1, items: { $ref: '#/components/schemas/NewVariantInput' } }
+    UpdateProductInput:
+      type: object
+      additionalProperties: false
+      properties:
+        name: { type: string }
+        description: { type: string }
+        price: { type: integer }
+        categoryId: { type: integer }
+        isActive: { type: boolean }
+        variants:
+          type: array
+          minItems: 1
+          items:
+            oneOf:
+              - $ref: '#/components/schemas/NewVariantInput'
+              - $ref: '#/components/schemas/ExistingVariantInput'
+    OrderHistory:
+      type: object
+      required: [id, type, fromStatus, toStatus, actorType, actorUserId, reason, occurredAt, recordedAt]
+      properties:
+        id: { type: integer }
+        type: { type: string, enum: [CREATED, TRANSITION, BASELINE] }
+        fromStatus: { oneOf: [{ $ref: '#/components/schemas/OrderStatus' }, { type: 'null' }] }
+        toStatus: { $ref: '#/components/schemas/OrderStatus' }
+        actorType: { $ref: '#/components/schemas/ActorType' }
+        actorUserId: { type: [integer, 'null'] }
+        reason: { type: [string, 'null'] }
+        occurredAt: { type: [string, 'null'], format: date-time }
+        recordedAt: { type: string, format: date-time }
+    OrderItem:
+      type: object
+      required: [id, productId, productName, productImage, size, color, unitPrice, quantity, lineTotal]
+      properties:
+        id: { type: integer }
+        productId: { type: [integer, 'null'] }
+        productName: { type: string }
+        productImage: { type: [string, 'null'] }
+        size: { type: [string, 'null'] }
+        color: { type: [string, 'null'] }
+        unitPrice: { type: integer }
+        quantity: { type: integer }
+        lineTotal: { type: integer }
+    Order:
+      type: object
+      required: [id, code, status, paymentMethod, paymentStatus, subtotal, shippingFee, total, receiverName, receiverPhone, shippingLine1, shippingWard, shippingDistrict, shippingProvince, note, createdAt, items]
+      properties:
+        id: { type: integer }
+        code: { type: string }
+        status: { $ref: '#/components/schemas/OrderStatus' }
+        paymentMethod: { $ref: '#/components/schemas/PaymentMethod' }
+        paymentStatus: { $ref: '#/components/schemas/PaymentStatus' }
+        subtotal: { type: integer }
+        shippingFee: { type: integer }
+        total: { type: integer }
+        receiverName: { type: string }
+        receiverPhone: { type: string }
+        shippingLine1: { type: string }
+        shippingWard: { type: string }
+        shippingDistrict: { type: string }
+        shippingProvince: { type: string }
+        note: { type: [string, 'null'] }
+        createdAt: { type: string, format: date-time }
+        items: { type: array, items: { $ref: '#/components/schemas/OrderItem' } }
+        statusHistory: { type: array, items: { $ref: '#/components/schemas/OrderHistory' } }
+    AdminOrder:
+      allOf:
+        - $ref: '#/components/schemas/Order'
+        - type: object
+          required: [user]
+          properties:
+            user:
+              type: object
+              required: [id, email, fullName]
+              properties: { id: { type: integer }, email: { type: string }, fullName: { type: string } }
+    InventoryMovement:
+      type: object
+      required: [id, variantId, productNameSnapshot, sizeSnapshot, colorSnapshot, type, beforeStock, afterStock, delta, orderId, actorType, actorUserId, reason, operationKey, createdAt]
+      properties:
+        id: { type: integer }
+        variantId: { type: [integer, 'null'] }
+        productNameSnapshot: { type: string }
+        sizeSnapshot: { type: string }
+        colorSnapshot: { type: string }
+        type: { type: string, enum: [BASELINE, INITIAL_STOCK, ORDER_RESERVED, ORDER_RESTORED, ADMIN_ADJUSTMENT, VARIANT_RETIRED] }
+        beforeStock: { type: [integer, 'null'] }
+        afterStock: { type: integer }
+        delta: { type: [integer, 'null'] }
+        orderId: { type: [integer, 'null'] }
+        actorType: { $ref: '#/components/schemas/ActorType' }
+        actorUserId: { type: [integer, 'null'] }
+        reason: { type: [string, 'null'] }
+        operationKey: { type: string }
+        createdAt: { type: string, format: date-time }
+    InventoryItem:
+      type: object
+      required: [id, size, color, stock, updatedAt, product]
+      properties:
+        id: { type: integer }
+        size: { type: string }
+        color: { type: string }
+        stock: { type: integer }
+        updatedAt: { type: string, format: date-time }
+        product:
+          type: object
+          required: [id, name, slug, price, isActive, category, thumbUrl]
+          properties:
+            id: { type: integer }
+            name: { type: string }
+            slug: { type: string }
+            price: { type: integer }
+            isActive: { type: boolean }
+            thumbUrl: { type: [string, 'null'] }
+            category:
+              type: object
+              required: [id, name]
+              properties: { id: { type: integer }, name: { type: string } }
+    AdminUser:
+      type: object
+      required: [id, email, fullName, phone, avatarUrl, role, createdAt, _count]
+      properties:
+        id: { type: integer }
+        email: { type: string }
+        fullName: { type: string }
+        phone: { type: [string, 'null'] }
+        avatarUrl: { type: [string, 'null'] }
+        role: { $ref: '#/components/schemas/Role' }
+        createdAt: { type: string, format: date-time }
+        _count:
+          type: object
+          required: [orders, addresses]
+          properties: { orders: { type: integer }, addresses: { type: integer } }
+    AdminUserDetail:
+      allOf:
+        - $ref: '#/components/schemas/AdminUser'
+        - type: object
+          required: [updatedAt, addresses, orders, stats]
+          properties:
+            updatedAt: { type: string, format: date-time }
+            addresses:
+              type: array
+              items:
+                type: object
+                required: [id, fullName, phone, line1, ward, district, province, isDefault]
+                properties:
+                  id: { type: integer }
+                  fullName: { type: string }
+                  phone: { type: string }
+                  line1: { type: string }
+                  ward: { type: string }
+                  district: { type: string }
+                  province: { type: string }
+                  isDefault: { type: boolean }
+            orders:
+              type: array
+              items:
+                type: object
+                required: [id, code, status, total, createdAt]
+                properties:
+                  id: { type: integer }
+                  code: { type: string }
+                  status: { $ref: '#/components/schemas/OrderStatus' }
+                  total: { type: integer }
+                  createdAt: { type: string, format: date-time }
+            stats:
+              type: object
+              required: [deliveredOrders, totalSpent]
+              properties: { deliveredOrders: { type: integer }, totalSpent: { type: integer } }
+    AdminStats:
+      type: object
+      required: [revenue, orders, catalog, stock, customers, series, topProducts, recentOrders, lowStockVariants]
+      properties:
+        revenue:
+          type: object
+          required: [delivered, inProgress, last7Days, previous7Days]
+          properties: { delivered: { type: integer }, inProgress: { type: integer }, last7Days: { type: integer }, previous7Days: { type: integer } }
+        orders:
+          type: object
+          required: [total, pending, confirmed, shipping, delivered, cancelled]
+          properties: { total: { type: integer }, pending: { type: integer }, confirmed: { type: integer }, shipping: { type: integer }, delivered: { type: integer }, cancelled: { type: integer } }
+        catalog:
+          type: object
+          required: [products, activeProducts, categories, variants]
+          properties: { products: { type: integer }, activeProducts: { type: integer }, categories: { type: integer }, variants: { type: integer } }
+        stock:
+          type: object
+          required: [units, low, out, threshold]
+          properties: { units: { type: integer }, low: { type: integer }, out: { type: integer }, threshold: { type: integer } }
+        customers:
+          type: object
+          required: [total, newLast7Days]
+          properties: { total: { type: integer }, newLast7Days: { type: integer } }
+        series:
+          type: array
+          items:
+            type: object
+            required: [date, orders, revenue]
+            properties: { date: { type: string }, orders: { type: integer }, revenue: { type: integer } }
+        topProducts:
+          type: array
+          items:
+            type: object
+            required: [productId, name, quantity, revenue]
+            properties: { productId: { type: [integer, 'null'] }, name: { type: string }, quantity: { type: integer }, revenue: { type: integer } }
+        recentOrders:
+          type: array
+          items:
+            type: object
+            required: [id, code, status, total, createdAt, user]
+            properties:
+              id: { type: integer }
+              code: { type: string }
+              status: { $ref: '#/components/schemas/OrderStatus' }
+              total: { type: integer }
+              createdAt: { type: string, format: date-time }
+              user:
+                type: object
+                required: [fullName, email]
+                properties: { fullName: { type: string }, email: { type: string } }
+        lowStockVariants:
+          type: array
+          items:
+            type: object
+            required: [id, size, color, stock, productId, productName, thumbUrl]
+            properties:
+              id: { type: integer }
+              size: { type: string }
+              color: { type: string }
+              stock: { type: integer }
+              productId: { type: integer }
+              productName: { type: string }
+              thumbUrl: { type: [string, 'null'] }
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties: { code: { type: string }, message: { type: string }, details: {} }
+  responses:
+    Error: { description: Request failed, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+paths:
+  /admin/stats:
+    get:
+      operationId: getAdminStats
+      responses: { '200': { description: Dashboard statistics, content: { application/json: { schema: { $ref: '#/components/schemas/AdminStats' } } } } }
+  /admin/inventory:
+    get:
+      operationId: listAdminInventory
+      parameters:
+        - { name: search, in: query, schema: { type: string } }
+        - { name: categoryId, in: query, schema: { type: integer } }
+        - { name: lowOnly, in: query, schema: { type: boolean } }
+        - { name: sort, in: query, schema: { type: string, enum: [stock-asc, stock-desc, name] } }
+        - { name: page, in: query, schema: { type: integer } }
+        - { name: limit, in: query, schema: { type: integer } }
+      responses:
+        '200':
+          description: Inventory page
+          content: { application/json: { schema: { type: object, required: [items, pagination, threshold], properties: { items: { type: array, items: { $ref: '#/components/schemas/InventoryItem' } }, pagination: { $ref: '#/components/schemas/Pagination' }, threshold: { type: integer } } } } }
+  /admin/inventory/{id}:
+    patch:
+      operationId: updateAdminStock
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [stock, expectedStock, reason], properties: { stock: { type: integer }, expectedStock: { type: integer }, reason: { type: string } } } } } }
+      responses:
+        '200': { description: Updated stock, content: { application/json: { schema: { type: object, required: [variant, movement], properties: { variant: { type: object, required: [id, stock], properties: { id: { type: integer }, stock: { type: integer } } }, movement: { $ref: '#/components/schemas/InventoryMovement' } } } } } }
+  /admin/inventory/{id}/movements:
+    get:
+      operationId: listAdminInventoryMovements
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }, { name: page, in: query, schema: { type: integer } }, { name: limit, in: query, schema: { type: integer } }]
+      responses: { '200': { description: Movement page, content: { application/json: { schema: { type: object, required: [items, pagination], properties: { items: { type: array, items: { $ref: '#/components/schemas/InventoryMovement' } }, pagination: { $ref: '#/components/schemas/Pagination' } } } } } } }
+  /admin/products:
+    get:
+      operationId: listAdminProducts
+      parameters: [{ name: search, in: query, schema: { type: string } }, { name: categoryId, in: query, schema: { type: integer } }, { name: minPrice, in: query, schema: { type: integer } }, { name: maxPrice, in: query, schema: { type: integer } }, { name: size, in: query, schema: { type: string } }, { name: color, in: query, schema: { type: string } }, { name: sort, in: query, schema: { type: string, enum: [newest, price-asc, price-desc, name] } }, { name: page, in: query, schema: { type: integer } }, { name: limit, in: query, schema: { type: integer } }]
+      responses: { '200': { description: Product page, content: { application/json: { schema: { type: object, required: [items, pagination], properties: { items: { type: array, items: { $ref: '#/components/schemas/ProductSummary' } }, pagination: { $ref: '#/components/schemas/Pagination' } } } } } } }
+    post:
+      operationId: createAdminProduct
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CreateProductInput' } } } }
+      responses: { '201': { description: Product created, content: { application/json: { schema: { type: object, required: [product], properties: { product: { $ref: '#/components/schemas/ProductDetail' } } } } } } }
+  /admin/products/{id}:
+    get:
+      operationId: getAdminProduct
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses: { '200': { description: Product detail, content: { application/json: { schema: { type: object, required: [product], properties: { product: { $ref: '#/components/schemas/ProductDetail' } } } } } } }
+    patch:
+      operationId: updateAdminProduct
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/UpdateProductInput' } } } }
+      responses: { '200': { description: Product updated, content: { application/json: { schema: { type: object, required: [product], properties: { product: { $ref: '#/components/schemas/ProductDetail' } } } } } } }
+    delete:
+      operationId: deleteAdminProduct
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses: { '204': { description: Product deleted } }
+  /admin/products/{id}/images:
+    post:
+      operationId: uploadAdminProductImages
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { multipart/form-data: { schema: { type: object, required: [images], properties: { images: { type: array, items: { type: string, format: binary } } } } } } }
+      responses: { '201': { description: Images uploaded, content: { application/json: { schema: { type: object, required: [product], properties: { product: { $ref: '#/components/schemas/ProductDetail' } } } } } } }
+  /admin/products/{id}/images/order:
+    patch:
+      operationId: reorderAdminProductImages
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [imageIds], properties: { imageIds: { type: array, items: { type: integer } } } } } } }
+      responses: { '200': { description: Images reordered, content: { application/json: { schema: { type: object, required: [product], properties: { product: { $ref: '#/components/schemas/ProductDetail' } } } } } } }
+  /admin/product-images/{id}:
+    delete:
+      operationId: deleteAdminProductImage
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses: { '204': { description: Image deleted } }
+  /admin/categories:
+    get:
+      operationId: listAdminCategories
+      responses: { '200': { description: Category tree, content: { application/json: { schema: { type: object, required: [categories], properties: { categories: { type: array, items: { $ref: '#/components/schemas/Category' } } } } } } } }
+    post:
+      operationId: createAdminCategory
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CreateCategoryInput' } } } }
+      responses: { '201': { description: Category created, content: { application/json: { schema: { type: object, required: [category], properties: { category: { $ref: '#/components/schemas/Category' } } } } } } }
+  /admin/categories/{id}:
+    patch:
+      operationId: updateAdminCategory
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/UpdateCategoryInput' } } } }
+      responses: { '200': { description: Category updated, content: { application/json: { schema: { type: object, required: [category], properties: { category: { $ref: '#/components/schemas/Category' } } } } } } }
+    delete:
+      operationId: deleteAdminCategory
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses: { '204': { description: Category deleted } }
+  /admin/orders:
+    get:
+      operationId: listAdminOrders
+      parameters: [{ name: search, in: query, schema: { type: string } }, { name: status, in: query, schema: { $ref: '#/components/schemas/OrderStatus' } }, { name: paymentStatus, in: query, schema: { $ref: '#/components/schemas/PaymentStatus' } }, { name: paymentMethod, in: query, schema: { $ref: '#/components/schemas/PaymentMethod' } }, { name: from, in: query, schema: { type: string, format: date } }, { name: to, in: query, schema: { type: string, format: date } }, { name: page, in: query, schema: { type: integer } }, { name: limit, in: query, schema: { type: integer } }]
+      responses: { '200': { description: Order page, content: { application/json: { schema: { type: object, required: [items, pagination], properties: { items: { type: array, items: { $ref: '#/components/schemas/AdminOrder' } }, pagination: { $ref: '#/components/schemas/Pagination' } } } } } } }
+  /admin/orders/{code}:
+    get:
+      operationId: getAdminOrder
+      parameters: [{ name: code, in: path, required: true, schema: { type: string } }]
+      responses: { '200': { description: Order detail, content: { application/json: { schema: { type: object, required: [order], properties: { order: { $ref: '#/components/schemas/AdminOrder' } } } } } } }
+  /admin/orders/{id}/status:
+    patch:
+      operationId: updateAdminOrderStatus
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [status], properties: { status: { $ref: '#/components/schemas/OrderStatus' } } } } } }
+      responses: { '200': { description: Status updated, content: { application/json: { schema: { type: object, required: [order, replayed], properties: { order: { $ref: '#/components/schemas/Order' }, replayed: { type: boolean } } } } } } }
+  /admin/orders/{id}/payment-status:
+    patch:
+      operationId: updateAdminPaymentStatus
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [paymentStatus], properties: { paymentStatus: { $ref: '#/components/schemas/PaymentStatus' } } } } } }
+      responses: { '200': { description: Payment updated, content: { application/json: { schema: { type: object, required: [order], properties: { order: { $ref: '#/components/schemas/AdminOrder' } } } } } } }
+  /admin/users:
+    get:
+      operationId: listAdminUsers
+      parameters: [{ name: search, in: query, schema: { type: string } }, { name: role, in: query, schema: { $ref: '#/components/schemas/Role' } }, { name: sort, in: query, schema: { type: string, enum: [newest, orders-desc, name] } }, { name: page, in: query, schema: { type: integer } }, { name: limit, in: query, schema: { type: integer } }]
+      responses: { '200': { description: User page, content: { application/json: { schema: { type: object, required: [items, pagination], properties: { items: { type: array, items: { $ref: '#/components/schemas/AdminUser' } }, pagination: { $ref: '#/components/schemas/Pagination' } } } } } } }
+  /admin/users/{id}:
+    get:
+      operationId: getAdminUser
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses: { '200': { description: User detail, content: { application/json: { schema: { type: object, required: [user], properties: { user: { $ref: '#/components/schemas/AdminUserDetail' } } } } } } }
+  /admin/users/{id}/role:
+    patch:
+      operationId: updateAdminUserRole
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [role], properties: { role: { $ref: '#/components/schemas/Role' } } } } } }
+      responses: { '200': { description: Role updated, content: { application/json: { schema: { type: object, required: [user], properties: { user: { $ref: '#/components/schemas/AdminUser' } } } } } } }
+  /admin/users/{id}/revoke-sessions:
+    post:
+      operationId: revokeAdminUserSessions
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses: { '200': { description: Sessions revoked, content: { application/json: { schema: { type: object, required: [revoked], properties: { revoked: { type: integer } } } } } } }

@@ -1,0 +1,42 @@
+# dependencies
+node_modules/
+
+# biến môi trường — .env.example vẫn được commit
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# build output
+dist/
+build/
+
+# ảnh upload: giữ thư mục, bỏ nội dung
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# logs
+*.log
+npm-debug.log*
+logs/
+
+# test / coverage
+coverage/
+.vitest/
+
+# cấu hình máy cá nhân của Claude Code
+.claude/settings.local.json
+
+# cấu hình và hướng dẫn dành riêng cho AI agent
+.claude/
+.agents/
+.agent/
+AGENTS.md
+
+# editor / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+.tmp/

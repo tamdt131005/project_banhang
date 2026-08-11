@@ -1,0 +1,368 @@
+// Prisma schema — MySQL 8.4 (Laragon). Provider "mysql" dùng chung cho cả MySQL và MariaDB.
+//
+// Quy ước tiền tệ: mọi trường tiền là Int, đơn vị VND.
+// VND không có phần lẻ nên số nguyên đúng bản chất, đồng thời tránh bẫy
+// serialize của Prisma.Decimal (JSON.stringify ra object chứ không ra số).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Prisma 7 không còn nhận `url` ở đây nữa. Chuỗi kết nối nằm ở hai chỗ:
+//   - prisma.config.ts  → cho các lệnh migrate/studio/db
+//   - src/lib/prisma.ts → cho runtime, qua driver adapter PrismaMariaDb
+datasource db {
+  provider = "mysql"
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum OrderStatus {
+  PENDING // chờ xác nhận
+  CONFIRMED // đã xác nhận
+  SHIPPING // đang giao
+  DELIVERED // đã giao
+  CANCELLED // đã huỷ
+}
+
+enum PaymentMethod {
+  COD
+  MOMO
+}
+
+enum PaymentStatus {
+  UNPAID
+  PAID
+  FAILED
+}
+
+enum AuditActorType {
+  CUSTOMER
+  ADMIN
+  SYSTEM
+}
+
+enum OrderHistoryType {
+  CREATED
+  TRANSITION
+  BASELINE
+}
+
+enum InventoryMovementType {
+  BASELINE
+  INITIAL_STOCK
+  ORDER_RESERVED
+  ORDER_RESTORED
+  ADMIN_ADJUSTMENT
+  VARIANT_RETIRED
+}
+
+// ---------------------------------------------------------------- người dùng
+
+model User {
+  id           Int     @id @default(autoincrement())
+  email        String  @unique @db.VarChar(191)
+  passwordHash String  @db.VarChar(255)
+  fullName     String  @db.VarChar(120)
+  phone        String? @db.VarChar(20)
+  /// Đường dẫn /uploads/... do người dùng tải lên; null = dùng avatar chữ viết tắt.
+  avatarUrl    String? @db.VarChar(500)
+  role         Role    @default(USER)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  addresses     Address[]
+  cart          Cart?
+  orders        Order[]
+  refreshTokens RefreshToken[]
+  orderStatusHistory OrderStatusHistory[] @relation("OrderStatusActor")
+  inventoryMovements InventoryMovement[]  @relation("InventoryMovementActor")
+
+  @@map("users")
+}
+
+/// Lưu SHA-256 của refresh token chứ không lưu token gốc: nếu database bị lộ
+/// thì kẻ tấn công vẫn không mạo danh được phiên đăng nhập nào.
+model RefreshToken {
+  id        Int       @id @default(autoincrement())
+  tokenHash String    @unique @db.VarChar(64)
+  userId    Int
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+model Address {
+  id        Int     @id @default(autoincrement())
+  userId    Int
+  fullName  String  @db.VarChar(120)
+  phone     String  @db.VarChar(20)
+  line1     String  @db.VarChar(255)
+  ward      String  @db.VarChar(120)
+  district  String  @db.VarChar(120)
+  province  String  @db.VarChar(120)
+  isDefault Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("addresses")
+}
+
+// ------------------------------------------------------------------ danh mục
+
+model Category {
+  id        Int    @id @default(autoincrement())
+  name      String @db.VarChar(120)
+  slug      String @unique @db.VarChar(191)
+  parentId  Int?
+  sortOrder Int    @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // NoAction cho cả hai chiều: MySQL từ chối tạo khoá ngoại tự tham chiếu
+  // khi dùng Cascade. NoAction trong MySQL kiểm tra ngay lập tức, nên vẫn
+  // chặn được việc xoá danh mục cha đang có danh mục con.
+  parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  children Category[] @relation("CategoryTree")
+  products Product[]
+
+  @@index([parentId])
+  @@map("categories")
+}
+
+// ------------------------------------------------------------------ sản phẩm
+
+/// Tồn kho KHÔNG nằm ở đây mà nằm trên từng biến thể (size × màu).
+/// Tổng tồn của sản phẩm là tổng stock các biến thể, tính lúc đọc.
+model Product {
+  id          Int     @id @default(autoincrement())
+  name        String  @db.VarChar(255)
+  slug        String  @unique @db.VarChar(191)
+  description String  @db.Text
+  price       Int // VND — các biến thể dùng chung một giá
+  categoryId  Int
+  isActive    Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  category   Category       @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  images     ProductImage[]
+  variants   ProductVariant[]
+  orderItems OrderItem[]
+
+  @@index([categoryId])
+  @@index([isActive, createdAt])
+  @@index([price])
+  @@map("products")
+}
+
+/// Một biến thể mua được: tổ hợp size × màu với tồn kho riêng.
+/// Sản phẩm một cỡ (mũ, túi) dùng size "Freesize" — vẫn là một biến thể
+/// bình thường, nhờ vậy giỏ hàng và đơn hàng chỉ có đúng một đường đi.
+model ProductVariant {
+  id        Int    @id @default(autoincrement())
+  productId Int
+  size      String @db.VarChar(20)
+  color     String @db.VarChar(50)
+  stock     Int    @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  product    Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  cartItems  CartItem[]
+  orderItems OrderItem[]
+  inventoryMovements InventoryMovement[]
+
+  @@unique([productId, size, color])
+  @@index([productId])
+  @@map("product_variants")
+}
+
+model ProductImage {
+  id        Int    @id @default(autoincrement())
+  productId Int
+  url       String @db.VarChar(500)
+  thumbUrl  String @db.VarChar(500)
+  sortOrder Int    @default(0)
+
+  createdAt DateTime @default(now())
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@map("product_images")
+}
+
+// ----------------------------------------------------------------- giỏ hàng
+
+model Cart {
+  id     Int @id @default(autoincrement())
+  userId Int @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items CartItem[]
+
+  @@map("carts")
+}
+
+/// Mỗi dòng giỏ là MỘT BIẾN THỂ: cùng chiếc áo nhưng size M đen và size L
+/// trắng là hai dòng riêng. Xoá biến thể thì dòng giỏ mất theo (Cascade) —
+/// giỏ hàng là dữ liệu tạm, không phải lịch sử.
+model CartItem {
+  id        Int @id @default(autoincrement())
+  cartId    Int
+  variantId Int
+  quantity  Int
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cart    Cart           @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@unique([cartId, variantId])
+  @@index([variantId])
+  @@map("cart_items")
+}
+
+// ----------------------------------------------------------------- đơn hàng
+
+/// Đơn hàng chụp lại (snapshot) địa chỉ giao và thông tin sản phẩm tại thời
+/// điểm mua. Nhờ vậy khách sửa địa chỉ hay admin đổi giá/xoá sản phẩm về sau
+/// đều không làm sai lệch lịch sử đơn.
+model Order {
+  id            Int           @id @default(autoincrement())
+  code          String        @unique @db.VarChar(32)
+  userId        Int
+  status        OrderStatus   @default(PENDING)
+  paymentMethod PaymentMethod @default(COD)
+  paymentStatus PaymentStatus @default(UNPAID)
+
+  subtotal    Int
+  shippingFee Int @default(0)
+  total       Int
+
+  receiverName     String @db.VarChar(120)
+  receiverPhone    String @db.VarChar(20)
+  shippingLine1    String @db.VarChar(255)
+  shippingWard     String @db.VarChar(120)
+  shippingDistrict String @db.VarChar(120)
+  shippingProvince String @db.VarChar(120)
+
+  note String? @db.VarChar(500)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user               User                 @relation(fields: [userId], references: [id], onDelete: Restrict)
+  items              OrderItem[]
+  statusHistory      OrderStatusHistory[]
+  inventoryMovements InventoryMovement[]
+
+  @@index([userId, createdAt])
+  @@index([status])
+  @@map("orders")
+}
+
+model OrderItem {
+  id      Int @id @default(autoincrement())
+  orderId Int
+
+  // SetNull: xoá sản phẩm/biến thể không được làm mất dòng hàng trong đơn cũ.
+  // variantId dùng để hoàn tồn kho khi huỷ đơn; null nghĩa là biến thể đã bị
+  // xoá và không còn chỗ nào để hoàn.
+  productId Int?
+  variantId Int?
+
+  productName  String  @db.VarChar(255)
+  productImage String? @db.VarChar(500)
+  // Snapshot size/màu tại thời điểm mua — hiển thị lịch sử không phụ thuộc
+  // biến thể còn tồn tại hay không. Null ở các đơn tạo trước khi có biến thể.
+  size  String? @db.VarChar(20)
+  color String? @db.VarChar(50)
+
+  unitPrice Int
+  quantity  Int
+  lineTotal Int
+
+  order   Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product?        @relation(fields: [productId], references: [id], onDelete: SetNull)
+  variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+
+  @@index([orderId])
+  @@index([productId])
+  @@index([variantId])
+  @@map("order_items")
+}
+
+/// Append-only audit trail for order lifecycle changes. Application code never updates or
+/// deletes these rows; `operationKey` makes each business event idempotent.
+model OrderStatusHistory {
+  id          Int              @id @default(autoincrement())
+  orderId     Int
+  type        OrderHistoryType
+  fromStatus  OrderStatus?
+  toStatus    OrderStatus
+  actorType   AuditActorType
+  actorUserId Int?
+  reason      String?          @db.VarChar(500)
+  occurredAt  DateTime?
+  recordedAt  DateTime         @default(now())
+  operationKey String          @unique @db.VarChar(191)
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  actor User? @relation("OrderStatusActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([orderId, recordedAt, id])
+  @@index([actorUserId])
+  @@map("order_status_history")
+}
+
+/// Append-only stock ledger. Product/variant and user snapshots keep the entry useful after
+/// nullable references are removed. Normal movements satisfy `afterStock = beforeStock + delta`;
+/// BASELINE is the only type with null beforeStock/delta.
+model InventoryMovement {
+  id                  Int                   @id @default(autoincrement())
+  variantId           Int?
+  productNameSnapshot String                @db.VarChar(255)
+  sizeSnapshot        String                @db.VarChar(20)
+  colorSnapshot       String                @db.VarChar(50)
+  type                InventoryMovementType
+  beforeStock         Int?
+  afterStock          Int
+  delta               Int?
+  orderId             Int?
+  actorType           AuditActorType
+  actorUserId         Int?
+  reason              String?               @db.VarChar(500)
+  operationKey        String                @unique @db.VarChar(191)
+  createdAt           DateTime              @default(now())
+
+  variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  order   Order?          @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  actor   User?           @relation("InventoryMovementActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([variantId, createdAt, id])
+  @@index([orderId])
+  @@index([actorUserId])
+  @@map("inventory_movements")
+}

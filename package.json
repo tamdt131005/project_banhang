@@ -1,0 +1,21 @@
+{
+  "name": "agentchuan",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Website ban hang - backend Express + Prisma/MariaDB, frontend React + Vite",
+  "scripts": {
+    "dev": "concurrently -n backend,frontend -c cyan,magenta \"npm --prefix backend run dev\" \"npm --prefix frontend run dev\"",
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "build": "npm --prefix backend run build && npm --prefix frontend run build",
+    "test": "npm --prefix backend test",
+    "typecheck": "npm --prefix backend run typecheck && npm --prefix frontend run typecheck",
+    "setup": "npm --prefix backend install && npm --prefix frontend install"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

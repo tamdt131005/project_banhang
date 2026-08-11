@@ -1,0 +1,14 @@
+{
+  "name": "@agentchuan/openapi-contract",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "generate": "node generate.mjs",
+    "check": "node check.mjs"
+  },
+  "devDependencies": {
+    "openapi-typescript": "7.13.0",
+    "typescript": "5.9.3"
+  }
+}
