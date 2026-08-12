@@ -1,5 +1,6 @@
 import { Link, Outlet } from 'react-router-dom';
 import { useCategoryLinks } from '../../hooks/useCategoryLinks';
+import { CustomerChatWidget } from '../chat/CustomerChatWidget';
 import { TruckIcon, WalletIcon } from '../ui/icons';
 import { Header } from './Header';
 
@@ -89,6 +90,8 @@ export function ShopLayout({ className = '' }: Readonly<ShopLayoutProps>) {
           </p>
         </div>
       </footer>
+
+      <CustomerChatWidget />
     </div>
   );
 }

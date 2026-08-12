@@ -5,6 +5,7 @@ import {
   BoxIcon,
   ChevronRightIcon,
   GaugeIcon,
+  MessageIcon,
   ReceiptIcon,
   StoreIcon,
   TagIcon,
@@ -31,6 +32,7 @@ const GROUPS = [
     title: 'Bán hàng',
     links: [
       { to: '/admin/don-hang', label: 'Đơn hàng', icon: <ReceiptIcon />, end: false },
+      { to: '/admin/ho-tro', label: 'Hỗ trợ', icon: <MessageIcon />, end: false },
       { to: '/admin/khach-hang', label: 'Khách hàng', icon: <UsersIcon />, end: false },
     ],
   },

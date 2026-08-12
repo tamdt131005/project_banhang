@@ -112,6 +112,12 @@ Hai bảng có namespace operation key riêng; truy vấn cuối còn phát hi�
 
 ## Rollback
 
+### SPEC-CHAT-001 additive migration
+
+Migration `20260811215500_chat_human_support` chỉ tạo `conversations`, `chat_messages`, foreign keys và các index timeline/queue; không sửa hoặc backfill Product, Order hay Promotion. Development target là `agentchuan_shop`, test target là database riêng `agentchuan_shop_test`. Không dùng `migrate reset`.
+
+Sau migrate, xác minh read-only: hai bảng tồn tại; enum/status, foreign key và index khớp schema; `_prisma_migrations` ghi migration thành công; row counts của các bảng cũ khớp manifest trước migration. Nếu verification thất bại trước khi mở writer, giữ writer dừng và khôi phục full development backup đã kiểm SHA-256 theo DB-AUTH-CHAT-001. Database test được phép làm sạch fixture và không cần backup.
+
 ### Lỗi ứng dụng sau khi migration và data verification đã đạt
 
 Rollback code về phiên bản tương thích trước đó nhưng giữ nguyên hai bảng additive. Không chạy down migration và không drop bảng audit bằng tay.

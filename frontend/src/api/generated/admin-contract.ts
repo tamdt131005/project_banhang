@@ -4,6 +4,134 @@
  */
 
 export interface paths {
+    "/chat/conversations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["createChatConversation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/chat/conversations/{id}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listChatMessages"];
+        put?: never;
+        post: operations["sendChatMessage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/chat/conversations/{id}/request-admin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["requestChatAdmin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/chat/conversations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listAdminChatConversations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/chat/conversations/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getAdminChatConversation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/chat/conversations/{id}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["acceptAdminChatConversation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/chat/conversations/{id}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["sendAdminChatMessage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/chat/conversations/{id}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["closeAdminChatConversation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/stats": {
         parameters: {
             query?: never;
@@ -321,12 +449,53 @@ export interface components {
         /** @enum {string} */
         Role: "USER" | "ADMIN";
         /** @enum {string} */
+        ConversationStatus: "AI" | "WAITING_ADMIN" | "LIVE" | "CLOSED";
+        /** @enum {string} */
+        MessageSender: "USER" | "AI" | "ADMIN" | "SYSTEM";
+        /** @enum {string} */
         ActorType: "CUSTOMER" | "ADMIN" | "SYSTEM";
         Pagination: {
             page: number;
             limit: number;
             total: number;
             totalPages: number;
+        };
+        Conversation: {
+            id: number;
+            userId: number;
+            assignedAdminId: number | null;
+            status: components["schemas"]["ConversationStatus"];
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** Format: date-time */
+            closedAt: string | null;
+        };
+        ConversationParticipant: {
+            id: number;
+            /** Format: email */
+            email: string;
+            fullName: string;
+        };
+        AdminConversation: components["schemas"]["Conversation"] & {
+            user: components["schemas"]["ConversationParticipant"];
+            assignedAdmin: components["schemas"]["ConversationParticipant"] | null;
+        };
+        ChatMessage: {
+            id: number;
+            conversationId: number;
+            senderType: components["schemas"]["MessageSender"];
+            senderUserId: number | null;
+            content: string;
+            metadata: {
+                [key: string]: unknown;
+            } | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        ChatMessageInput: {
+            content: string;
         };
         Category: {
             id: number;
@@ -629,6 +798,245 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    createChatConversation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Conversation created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        conversation: components["schemas"]["Conversation"];
+                    };
+                };
+            };
+        };
+    };
+    listChatMessages: {
+        parameters: {
+            query?: {
+                page?: number;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Customer-owned message page */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        messages: components["schemas"]["ChatMessage"][];
+                        pagination: components["schemas"]["Pagination"];
+                    };
+                };
+            };
+        };
+    };
+    sendChatMessage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatMessageInput"];
+            };
+        };
+        responses: {
+            /** @description User message committed */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        conversation: components["schemas"]["Conversation"];
+                        message: components["schemas"]["ChatMessage"];
+                    };
+                };
+            };
+        };
+    };
+    requestChatAdmin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Human support requested or idempotently replayed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        conversation: components["schemas"]["Conversation"];
+                        message: components["schemas"]["ChatMessage"];
+                    };
+                };
+            };
+        };
+    };
+    listAdminChatConversations: {
+        parameters: {
+            query?: {
+                status?: components["schemas"]["ConversationStatus"];
+                page?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Support queue page */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["AdminConversation"][];
+                        pagination: components["schemas"]["Pagination"];
+                    };
+                };
+            };
+        };
+    };
+    getAdminChatConversation: {
+        parameters: {
+            query?: {
+                page?: number;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Conversation detail and message page */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        conversation: components["schemas"]["AdminConversation"];
+                        messages: components["schemas"]["ChatMessage"][];
+                        pagination: components["schemas"]["Pagination"];
+                    };
+                };
+            };
+        };
+    };
+    acceptAdminChatConversation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Support conversation atomically accepted */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        conversation: components["schemas"]["Conversation"];
+                        message: components["schemas"]["ChatMessage"];
+                    };
+                };
+            };
+        };
+    };
+    sendAdminChatMessage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatMessageInput"];
+            };
+        };
+        responses: {
+            /** @description Assigned-admin message committed */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        conversation: components["schemas"]["Conversation"];
+                        message: components["schemas"]["ChatMessage"];
+                    };
+                };
+            };
+        };
+    };
+    closeAdminChatConversation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Conversation closed or idempotently replayed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        conversation: components["schemas"]["Conversation"];
+                        message: components["schemas"]["ChatMessage"];
+                    };
+                };
+            };
+        };
+    };
     getAdminStats: {
         parameters: {
             query?: never;

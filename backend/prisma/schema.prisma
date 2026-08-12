@@ -20,6 +20,20 @@ enum Role {
   ADMIN
 }
 
+enum ConversationStatus {
+  AI
+  WAITING_ADMIN
+  LIVE
+  CLOSED
+}
+
+enum MessageSender {
+  USER
+  AI
+  ADMIN
+  SYSTEM
+}
+
 enum OrderStatus {
   PENDING // chờ xác nhận
   CONFIRMED // đã xác nhận
@@ -81,6 +95,9 @@ model User {
   refreshTokens RefreshToken[]
   orderStatusHistory OrderStatusHistory[] @relation("OrderStatusActor")
   inventoryMovements InventoryMovement[]  @relation("InventoryMovementActor")
+  customerConversations Conversation[]    @relation("ConversationCustomer")
+  assignedConversations Conversation[]    @relation("ConversationAdmin")
+  chatMessages          ChatMessage[]      @relation("ChatMessageSender")
 
   @@map("users")
 }
@@ -365,4 +382,42 @@ model InventoryMovement {
   @@index([orderId])
   @@index([actorUserId])
   @@map("inventory_movements")
+}
+
+// -------------------------------------------------------- chat & human support
+
+model Conversation {
+  id              Int                @id @default(autoincrement())
+  userId          Int
+  assignedAdminId Int?
+  status          ConversationStatus @default(AI)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  closedAt        DateTime?
+
+  user          User          @relation("ConversationCustomer", fields: [userId], references: [id], onDelete: Cascade)
+  assignedAdmin User?         @relation("ConversationAdmin", fields: [assignedAdminId], references: [id], onDelete: SetNull)
+  messages      ChatMessage[]
+
+  @@index([userId, createdAt, id])
+  @@index([status, createdAt, id])
+  @@index([assignedAdminId, status, updatedAt, id])
+  @@map("conversations")
+}
+
+model ChatMessage {
+  id             Int           @id @default(autoincrement())
+  conversationId Int
+  senderType     MessageSender
+  senderUserId   Int?
+  content        String        @db.Text
+  metadata       Json?
+  createdAt      DateTime      @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User?        @relation("ChatMessageSender", fields: [senderUserId], references: [id], onDelete: SetNull)
+
+  @@index([conversationId, createdAt, id])
+  @@index([senderUserId])
+  @@map("chat_messages")
 }

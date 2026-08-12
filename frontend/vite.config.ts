@@ -11,6 +11,7 @@ export default defineConfig({
       // trường dev. Cookie httpOnly nhờ vậy hoạt động ngay mà không phải cấu
       // hình SameSite=None hay CORS credentials.
       '/api': { target: 'http://localhost:4000' },
+      '/socket.io': { target: 'http://localhost:4000', ws: true },
       // Ảnh sản phẩm do backend phục vụ từ thư mục uploads/.
       '/uploads': { target: 'http://localhost:4000' },
     },

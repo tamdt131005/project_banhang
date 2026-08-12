@@ -13,6 +13,7 @@ import { AdminOrderDetailPage } from './pages/admin/AdminOrderDetailPage';
 import { AdminOrdersPage } from './pages/admin/AdminOrdersPage';
 import { AdminProductFormPage } from './pages/admin/AdminProductFormPage';
 import { AdminProductsPage } from './pages/admin/AdminProductsPage';
+import { AdminSupportPage } from './pages/admin/AdminSupportPage';
 import { LoginPage } from './pages/auth/LoginPage';
 import { RegisterPage } from './pages/auth/RegisterPage';
 import { AddressesPage } from './pages/shop/AddressesPage';
@@ -74,6 +75,7 @@ export default function App({}: Readonly<AppProps>) {
           <Route path="danh-muc" element={<AdminCategoriesPage />} />
           <Route path="don-hang" element={<AdminOrdersPage />} />
           <Route path="don-hang/:code" element={<AdminOrderDetailPage />} />
+          <Route path="ho-tro" element={<AdminSupportPage />} />
           <Route path="khach-hang" element={<AdminCustomersPage />} />
           <Route path="khach-hang/:id" element={<AdminCustomerDetailPage />} />
         </Route>

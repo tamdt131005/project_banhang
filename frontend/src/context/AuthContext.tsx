@@ -87,6 +87,7 @@ export function AuthProvider({ children }: Readonly<AuthProviderProps>) {
       queryClient.removeQueries({ queryKey: ['cart'] });
       queryClient.removeQueries({ queryKey: ['orders'] });
       queryClient.removeQueries({ queryKey: ['addresses'] });
+      queryClient.removeQueries({ queryKey: ['chat'] });
     },
   });
 

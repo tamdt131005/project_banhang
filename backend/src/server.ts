@@ -1,10 +1,14 @@
+import { createServer } from 'node:http';
 import { createApp } from './app.js';
 import { env } from './config/env.js';
 import { prisma } from './lib/prisma.js';
+import { attachChatSocket } from './modules/chat/chat.socket.js';
 
 const app = createApp();
+const server = createServer(app);
+attachChatSocket(server);
 
-const server = app.listen(env.PORT, () => {
+server.listen(env.PORT, () => {
   console.log(`API chạy tại http://localhost:${env.PORT}  (${env.NODE_ENV})`);
   console.log(`Kiểm tra:      http://localhost:${env.PORT}/api/health`);
 });

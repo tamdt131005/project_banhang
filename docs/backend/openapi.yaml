@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
   title: AgentChuan Admin API
-  version: 0.4.0
-  description: Source-of-truth transport contract for SPEC-BE-001 v0.3 and SPEC-FE-002 v0.2.
+  version: 0.5.0
+  description: Source-of-truth transport contract for SPEC-BE-001, SPEC-FE-002, and SPEC-CHAT-001.
 servers:
   - url: http://localhost:4000/api
 security:
@@ -15,6 +15,8 @@ components:
     PaymentStatus: { type: string, enum: [UNPAID, PAID, FAILED] }
     PaymentMethod: { type: string, enum: [COD, MOMO] }
     Role: { type: string, enum: [USER, ADMIN] }
+    ConversationStatus: { type: string, enum: [AI, WAITING_ADMIN, LIVE, CLOSED] }
+    MessageSender: { type: string, enum: [USER, AI, ADMIN, SYSTEM] }
     ActorType: { type: string, enum: [CUSTOMER, ADMIN, SYSTEM] }
     Pagination:
       type: object
@@ -24,6 +26,51 @@ components:
         limit: { type: integer }
         total: { type: integer }
         totalPages: { type: integer }
+    Conversation:
+      type: object
+      required: [id, userId, assignedAdminId, status, createdAt, updatedAt, closedAt]
+      properties:
+        id: { type: integer }
+        userId: { type: integer }
+        assignedAdminId: { type: [integer, 'null'] }
+        status: { $ref: '#/components/schemas/ConversationStatus' }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        closedAt: { type: [string, 'null'], format: date-time }
+    ConversationParticipant:
+      type: object
+      required: [id, email, fullName]
+      properties:
+        id: { type: integer }
+        email: { type: string, format: email }
+        fullName: { type: string }
+    AdminConversation:
+      allOf:
+        - $ref: '#/components/schemas/Conversation'
+        - type: object
+          required: [user, assignedAdmin]
+          properties:
+            user: { $ref: '#/components/schemas/ConversationParticipant' }
+            assignedAdmin:
+              oneOf:
+                - $ref: '#/components/schemas/ConversationParticipant'
+                - type: 'null'
+    ChatMessage:
+      type: object
+      required: [id, conversationId, senderType, senderUserId, content, metadata, createdAt]
+      properties:
+        id: { type: integer }
+        conversationId: { type: integer }
+        senderType: { $ref: '#/components/schemas/MessageSender' }
+        senderUserId: { type: [integer, 'null'] }
+        content: { type: string }
+        metadata: { type: [object, 'null'], additionalProperties: true }
+        createdAt: { type: string, format: date-time }
+    ChatMessageInput:
+      type: object
+      additionalProperties: false
+      required: [content]
+      properties: { content: { type: string, minLength: 1, maxLength: 4000 } }
     Category:
       type: object
       required: [id, name, slug, sortOrder, productCount, children]
@@ -365,6 +412,60 @@ components:
   responses:
     Error: { description: Request failed, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
 paths:
+  /chat/conversations:
+    post:
+      operationId: createChatConversation
+      responses:
+        '201': { description: Conversation created, content: { application/json: { schema: { type: object, required: [conversation], properties: { conversation: { $ref: '#/components/schemas/Conversation' } } } } } }
+  /chat/conversations/{id}/messages:
+    get:
+      operationId: listChatMessages
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }, { name: page, in: query, schema: { type: integer } }, { name: limit, in: query, schema: { type: integer } }]
+      responses:
+        '200': { description: Customer-owned message page, content: { application/json: { schema: { type: object, required: [messages, pagination], properties: { messages: { type: array, items: { $ref: '#/components/schemas/ChatMessage' } }, pagination: { $ref: '#/components/schemas/Pagination' } } } } } }
+    post:
+      operationId: sendChatMessage
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ChatMessageInput' } } } }
+      responses:
+        '201': { description: User message committed, content: { application/json: { schema: { type: object, required: [conversation, message], properties: { conversation: { $ref: '#/components/schemas/Conversation' }, message: { $ref: '#/components/schemas/ChatMessage' } } } } } }
+  /chat/conversations/{id}/request-admin:
+    post:
+      operationId: requestChatAdmin
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '200': { description: Human support requested or idempotently replayed, content: { application/json: { schema: { type: object, required: [conversation, message], properties: { conversation: { $ref: '#/components/schemas/Conversation' }, message: { $ref: '#/components/schemas/ChatMessage' } } } } } }
+  /admin/chat/conversations:
+    get:
+      operationId: listAdminChatConversations
+      parameters: [{ name: status, in: query, schema: { $ref: '#/components/schemas/ConversationStatus' } }, { name: page, in: query, schema: { type: integer } }, { name: limit, in: query, schema: { type: integer } }]
+      responses:
+        '200': { description: Support queue page, content: { application/json: { schema: { type: object, required: [items, pagination], properties: { items: { type: array, items: { $ref: '#/components/schemas/AdminConversation' } }, pagination: { $ref: '#/components/schemas/Pagination' } } } } } }
+  /admin/chat/conversations/{id}:
+    get:
+      operationId: getAdminChatConversation
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }, { name: page, in: query, schema: { type: integer } }, { name: limit, in: query, schema: { type: integer } }]
+      responses:
+        '200': { description: Conversation detail and message page, content: { application/json: { schema: { type: object, required: [conversation, messages, pagination], properties: { conversation: { $ref: '#/components/schemas/AdminConversation' }, messages: { type: array, items: { $ref: '#/components/schemas/ChatMessage' } }, pagination: { $ref: '#/components/schemas/Pagination' } } } } } }
+  /admin/chat/conversations/{id}/accept:
+    post:
+      operationId: acceptAdminChatConversation
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '200': { description: Support conversation atomically accepted, content: { application/json: { schema: { type: object, required: [conversation, message], properties: { conversation: { $ref: '#/components/schemas/Conversation' }, message: { $ref: '#/components/schemas/ChatMessage' } } } } } }
+  /admin/chat/conversations/{id}/messages:
+    post:
+      operationId: sendAdminChatMessage
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ChatMessageInput' } } } }
+      responses:
+        '201': { description: Assigned-admin message committed, content: { application/json: { schema: { type: object, required: [conversation, message], properties: { conversation: { $ref: '#/components/schemas/Conversation' }, message: { $ref: '#/components/schemas/ChatMessage' } } } } } }
+  /admin/chat/conversations/{id}/close:
+    post:
+      operationId: closeAdminChatConversation
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '200': { description: Conversation closed or idempotently replayed, content: { application/json: { schema: { type: object, required: [conversation, message], properties: { conversation: { $ref: '#/components/schemas/Conversation' }, message: { $ref: '#/components/schemas/ChatMessage' } } } } } }
   /admin/stats:
     get:
       operationId: getAdminStats

@@ -2,6 +2,16 @@
 
 Tài liệu này mô tả contract backend đã chốt cho tính toàn vẹn trạng thái đơn hàng và tồn kho. OpenAPI máy đọc được nằm tại [openapi.yaml](./openapi.yaml); quy trình dữ liệu nằm tại [database.md](./database.md).
 
+## Chat và human support V1
+
+- Tất cả REST chat yêu cầu cookie `access_token`; server luôn suy ra customer/admin từ JWT, không nhận danh tính người gửi từ body.
+- Customer có thể tạo nhiều conversation. `AI` là trạng thái self-service tương thích AI trong tương lai; V1 chỉ lưu tin nhắn USER và không tạo phản hồi AI giả.
+- Chuyển trạng thái: `AI -> WAITING_ADMIN -> LIVE -> CLOSED`; `AI -> CLOSED` dành cho trường hợp cần đóng sớm. Không reopen.
+- Accept claim có điều kiện `WAITING_ADMIN && assignedAdminId IS NULL`; assignment, trạng thái và SYSTEM message cùng transaction.
+- REST/service là writer duy nhất. Socket.IO chỉ xác thực bằng cookie httpOnly hiện có, kiểm tra quyền mỗi lần join room, và phát event sau commit.
+- Room: `conversation:{id}`, `support:admins`. Client commands: `conversation:join`, `support:subscribe`. Server events: `conversation.created`, `message.created`, `support.requested`, `support.accepted`, `conversation.closed`.
+- V1 không có Gemini, `GEMINI_API_KEY`, promotion hay return-policy tool. Các interface `AIProvider`, `AIOrchestrator` và tool registry là seam chưa nối provider.
+
 ## Nguyên tắc thực thi
 
 - Controller chỉ xác thực request và truyền `req.user.id`; quy tắc nghiệp vụ nằm trong service.

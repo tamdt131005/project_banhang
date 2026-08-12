@@ -24,7 +24,7 @@ export class ApiError extends Error {
  */
 let refreshInFlight: Promise<boolean> | null = null;
 
-function refreshSession(): Promise<boolean> {
+export function refreshSession(): Promise<boolean> {
   refreshInFlight ??= fetch('/api/auth/refresh', { method: 'POST', credentials: 'include' })
     .then((response) => response.ok)
     .catch(() => false)

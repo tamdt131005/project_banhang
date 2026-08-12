@@ -4,6 +4,8 @@ import { addressRouter } from './modules/addresses/address.routes.js';
 import { adminRouter } from './modules/admin/admin.routes.js';
 import { authRouter } from './modules/auth/auth.routes.js';
 import { cartRouter } from './modules/cart/cart.routes.js';
+import { chatRouter } from './modules/chat/chat.routes.js';
+import { adminChatRouter } from './modules/chat/admin-chat.routes.js';
 import { adminCategoryRouter, categoryRouter } from './modules/categories/category.routes.js';
 import { adminOrderRouter, orderRouter } from './modules/orders/order.routes.js';
 import {
@@ -43,11 +45,13 @@ apiRouter.use('/products', productRouter);
 apiRouter.use('/addresses', addressRouter);
 apiRouter.use('/cart', cartRouter);
 apiRouter.use('/orders', orderRouter);
+apiRouter.use('/chat', chatRouter);
 
 // ---------------------------------------------------------------------- admin
 // Đặt TRƯỚC các router con: /admin/stats và /admin/inventory là route riêng,
 // không được để router nào khác nuốt mất.
 apiRouter.use('/admin', adminRouter);
+apiRouter.use('/admin/chat', adminChatRouter);
 apiRouter.use('/admin/categories', adminCategoryRouter);
 apiRouter.use('/admin/products', adminProductRouter);
 apiRouter.use('/admin/product-images', adminProductImageRouter);

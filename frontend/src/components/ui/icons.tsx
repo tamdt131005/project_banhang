@@ -303,6 +303,15 @@ export function UsersIcon({ className }: Readonly<IconProps>) {
   );
 }
 
+export function MessageIcon({ className }: Readonly<IconProps>) {
+  return (
+    <Icon {...(className === undefined ? {} : { className })}>
+      <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v8a2.5 2.5 0 0 1-2.5 2.5H10l-5.5 4v-4.7A2.5 2.5 0 0 1 4 13.8V5.5Z" />
+      <path d="M8 8.5h8M8 12h5" />
+    </Icon>
+  );
+}
+
 export function StarIcon({ className }: Readonly<IconProps>) {
   return (
     <Icon {...(className === undefined ? {} : { className })}>

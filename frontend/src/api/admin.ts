@@ -10,7 +10,7 @@ import type {
 } from '../types/api';
 import type { ProductQuery } from './catalog';
 import { api } from './client';
-import type { paths } from './generated/admin-contract';
+import type { components, paths } from './generated/admin-contract';
 
 export interface NewVariantInput {
   size: string;
@@ -70,6 +70,11 @@ const adminPaths = {
   user: '/admin/users/{id}',
   userRole: '/admin/users/{id}/role',
   revokeSessions: '/admin/users/{id}/revoke-sessions',
+  chatConversations: '/admin/chat/conversations',
+  chatConversation: '/admin/chat/conversations/{id}',
+  chatAccept: '/admin/chat/conversations/{id}/accept',
+  chatMessages: '/admin/chat/conversations/{id}/messages',
+  chatClose: '/admin/chat/conversations/{id}/close',
 } as const satisfies Record<string, AdminContractPath>;
 
 function bindPath(template: AdminContractPath, parameter: string | number): string {
@@ -182,6 +187,18 @@ export interface UserListQuery {
   search?: string;
   role?: 'USER' | 'ADMIN';
   sort?: 'newest' | 'orders-desc' | 'name';
+  page?: number;
+  limit?: number;
+}
+
+export type AdminChatConversation = components['schemas']['AdminConversation'];
+export type AdminChatMessage = components['schemas']['ChatMessage'];
+export type AdminChatStatus = components['schemas']['ConversationStatus'];
+export type AdminChatDetailResponse = JsonResponse<'/admin/chat/conversations/{id}', 'get', 200>;
+export type AdminChatMessageResponse = JsonResponse<'/admin/chat/conversations/{id}/messages', 'post', 201>;
+
+export interface AdminChatQuery {
+  status: AdminChatStatus;
   page?: number;
   limit?: number;
 }
@@ -435,6 +452,44 @@ const adminApi = {
 
   revokeSessions: (id: number) =>
     api.post<JsonResponse<'/admin/users/{id}/revoke-sessions', 'post', 200>>(`/api${bindPath(adminPaths.revokeSessions, id)}`),
+
+  chatConversations: (query: AdminChatQuery) => {
+    const contractQuery = {
+      status: query.status,
+      page: query.page,
+      limit: query.limit,
+    } satisfies ContractQuery<'/admin/chat/conversations', 'get'>;
+    return api.get<JsonResponse<'/admin/chat/conversations', 'get', 200>>(
+      `/api${adminPaths.chatConversations}`,
+      contractQuery,
+    );
+  },
+
+  chatConversation: (conversationId: number, page = 1, limit = 100) => {
+    const contractQuery = { page, limit } satisfies ContractQuery<'/admin/chat/conversations/{id}', 'get'>;
+    return api.get<JsonResponse<'/admin/chat/conversations/{id}', 'get', 200>>(
+      `/api${bindPath(adminPaths.chatConversation, conversationId)}`,
+      contractQuery,
+    );
+  },
+
+  acceptChatConversation: (conversationId: number) =>
+    api.post<JsonResponse<'/admin/chat/conversations/{id}/accept', 'post', 200>>(
+      `/api${bindPath(adminPaths.chatAccept, conversationId)}`,
+    ),
+
+  sendChatMessage: (conversationId: number, content: string) => {
+    const body = { content } satisfies JsonRequestBody<'/admin/chat/conversations/{id}/messages', 'post'>;
+    return api.post<JsonResponse<'/admin/chat/conversations/{id}/messages', 'post', 201>>(
+      `/api${bindPath(adminPaths.chatMessages, conversationId)}`,
+      body,
+    );
+  },
+
+  closeChatConversation: (conversationId: number) =>
+    api.post<JsonResponse<'/admin/chat/conversations/{id}/close', 'post', 200>>(
+      `/api${bindPath(adminPaths.chatClose, conversationId)}`,
+    ),
 };
 
 interface AdminGateway {
@@ -472,6 +527,13 @@ interface AdminGateway {
     setRole(id: number, role: 'USER' | 'ADMIN'): Promise<{ user: AdminUser }>;
     revokeSessions(id: number): Promise<{ revoked: number }>;
   };
+  chat: {
+    list(query: AdminChatQuery): Promise<JsonResponse<'/admin/chat/conversations', 'get', 200>>;
+    detail(conversationId: number, page?: number, limit?: number): Promise<AdminChatDetailResponse>;
+    accept(conversationId: number): Promise<JsonResponse<'/admin/chat/conversations/{id}/accept', 'post', 200>>;
+    send(conversationId: number, content: string): Promise<AdminChatMessageResponse>;
+    close(conversationId: number): Promise<JsonResponse<'/admin/chat/conversations/{id}/close', 'post', 200>>;
+  };
 }
 
 export const adminGateway: AdminGateway = {
@@ -490,6 +552,13 @@ export const adminGateway: AdminGateway = {
   categories: { list: adminApi.categories, create: adminApi.createCategory, update: adminApi.updateCategory, remove: adminApi.removeCategory },
   orders: { list: adminApi.orders, detail: adminApi.order, setStatus: adminApi.setOrderStatus, setPaymentStatus: adminApi.setPaymentStatus },
   users: { list: adminApi.users, detail: adminApi.user, setRole: adminApi.setUserRole, revokeSessions: adminApi.revokeSessions },
+  chat: {
+    list: adminApi.chatConversations,
+    detail: adminApi.chatConversation,
+    accept: adminApi.acceptChatConversation,
+    send: adminApi.sendChatMessage,
+    close: adminApi.closeChatConversation,
+  },
 } as const;
 
 export { ApiError } from './client';
