@@ -2,7 +2,7 @@ import { hashPassword } from '../src/lib/password.js';
 import { prisma } from '../src/lib/prisma.js';
 
 /**
- * Dữ liệu mẫu cho tiệm quần áo CHUẨN — đủ để bấm thử ngay sau khi cài đặt.
+ * Dữ liệu mẫu cho tiệm quần áo Tâm Đặng — đủ để bấm thử ngay sau khi cài đặt.
  *
  * Taxonomy theo kiểu các shop thời trang Việt (giới → loại đồ): sản phẩm luôn
  * gắn vào danh mục con. Tồn kho nằm trên từng biến thể size × màu; sản phẩm

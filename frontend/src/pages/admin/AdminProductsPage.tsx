@@ -146,25 +146,25 @@ export function AdminProductsPage({}: Readonly<AdminProductsPageProps>) {
       ) : (
         <>
           {/* Bảng cuộn ngang trong hộp riêng — trang không bao giờ tràn ngang. */}
-          <div className="overflow-x-auto rounded-card border border-line bg-surface">
-            <table className="w-full min-w-[44rem] text-sm">
-              <thead className="border-b border-line bg-sunken text-left">
+          <div className="overflow-x-auto rounded-card border border-line bg-surface shadow-xs">
+            <table className="w-full min-w-[48rem] text-sm">
+              <thead className="border-b border-line bg-sunken/60 text-left text-xs text-ink-muted">
                 <tr>
-                  <th className="px-3 py-2 font-semibold">Sản phẩm</th>
-                  <th className="px-3 py-2 font-semibold">Danh mục</th>
-                  <th className="px-3 py-2 text-right font-semibold">Giá</th>
-                  <th className="px-3 py-2 text-right font-semibold">Tồn</th>
-                  <th className="px-3 py-2 font-semibold">Trạng thái</th>
-                  <th className="px-3 py-2" />
+                  <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[0.6875rem]">Sản phẩm</th>
+                  <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[0.6875rem]">Danh mục</th>
+                  <th className="px-4 py-3 text-right font-semibold uppercase tracking-wider text-[0.6875rem]">Giá bán</th>
+                  <th className="px-4 py-3 text-right font-semibold uppercase tracking-wider text-[0.6875rem]">Tồn kho</th>
+                  <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[0.6875rem]">Trạng thái</th>
+                  <th className="px-4 py-3 text-right font-semibold uppercase tracking-wider text-[0.6875rem]">Thao tác</th>
                 </tr>
               </thead>
 
               <tbody className="divide-y divide-line">
                 {products.data.items.map((product) => (
-                  <tr key={product.id}>
-                    <td className="px-3 py-2">
-                      <div className="flex items-center gap-2">
-                        <div className="size-10 shrink-0 overflow-hidden rounded bg-sunken">
+                  <tr key={product.id} className="hover:bg-sunken/40 transition-colors">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <div className="size-11 shrink-0 overflow-hidden rounded-control bg-sunken border border-line">
                           {product.images[0] ? (
                             <img
                               src={product.images[0].thumbUrl}
@@ -175,15 +175,41 @@ export function AdminProductsPage({}: Readonly<AdminProductsPageProps>) {
                             />
                           ) : null}
                         </div>
-                        <span className="line-clamp-2 max-w-[16rem]">{product.name}</span>
+                        <div className="min-w-0">
+                          <Link
+                            to={`/admin/san-pham/${product.id}`}
+                            className="font-semibold text-sm text-ink hover:text-accent transition line-clamp-1"
+                          >
+                            {product.name}
+                          </Link>
+                          <p className="text-xs text-ink-muted font-mono mt-0.5">#{product.id} · slug: {product.slug}</p>
+                        </div>
                       </div>
                     </td>
-                    <td className="px-3 py-2 text-ink-muted">{product.category.name}</td>
-                    <td className="tabular px-3 py-2 text-right">{formatVnd(product.price)}</td>
-                    <td className="tabular px-3 py-2 text-right">{product.stock}</td>
-                    <td className="px-3 py-2">
+                    <td className="px-4 py-3 text-ink-muted text-xs">
+                      <span className="rounded-full bg-sunken px-2 py-0.5 font-medium">
+                        {product.category.name}
+                      </span>
+                    </td>
+                    <td className="tabular px-4 py-3 text-right font-bold text-accent">
+                      {formatVnd(product.price)}
+                    </td>
+                    <td className="tabular px-4 py-3 text-right">
                       <span
-                        className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                        className={`font-semibold ${
+                          product.stock === 0
+                            ? 'text-red-500 font-bold'
+                            : product.stock <= 5
+                              ? 'text-amber-600 dark:text-amber-400'
+                              : 'text-ink'
+                        }`}
+                      >
+                        {product.stock}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
                           product.isActive
                             ? 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300'
                             : 'bg-sunken text-ink-muted'
@@ -192,11 +218,11 @@ export function AdminProductsPage({}: Readonly<AdminProductsPageProps>) {
                         {product.isActive ? 'Đang bán' : 'Đã ẩn'}
                       </span>
                     </td>
-                    <td className="px-3 py-2">
-                      <div className="flex justify-end gap-1">
+                    <td className="px-4 py-3 text-right whitespace-nowrap">
+                      <div className="inline-flex items-center justify-end gap-1">
                         <Link
                           to={`/admin/san-pham/${product.id}`}
-                          className="rounded-control px-2 py-1 text-xs font-medium text-accent hover:bg-accent-soft"
+                          className="rounded-control border border-line bg-surface px-2.5 py-1 text-xs font-medium text-ink transition hover:border-accent hover:text-accent shadow-2xs"
                         >
                           Sửa
                         </Link>
@@ -205,14 +231,14 @@ export function AdminProductsPage({}: Readonly<AdminProductsPageProps>) {
                           onClick={() =>
                             toggleActive.mutate({ id: product.id, isActive: !product.isActive })
                           }
-                          className="rounded-control px-2 py-1 text-xs hover:bg-sunken"
+                          className="rounded-control border border-line bg-surface px-2 py-1 text-xs font-medium text-ink-muted transition hover:bg-sunken hover:text-ink"
                         >
                           {product.isActive ? 'Ẩn' : 'Hiện'}
                         </button>
                         <button
                           type="button"
                           onClick={() => setDeleting(product)}
-                          className="rounded-control px-2 py-1 text-xs text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950"
+                          className="rounded-control border border-red-200 bg-surface px-2 py-1 text-xs font-medium text-red-600 transition hover:bg-red-50 dark:border-red-950 dark:text-red-400 dark:hover:bg-red-950"
                         >
                           Xoá
                         </button>

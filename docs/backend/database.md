@@ -1,5 +1,11 @@
 # Database runbook — DB-AUTH-001
 
+## SPEC-BANNER-001 — migration additive development
+
+Migration `20260815230000_home_banners` chỉ tạo bảng `banners`, enum vị trí `HOME_HERO` và index phục vụ truy vấn công khai; không backfill hay sửa bảng hiện có. Backup development đã được tạo tại `D:\nodejs\projectcv-backups\agentchuan_shop-before-banner-20260815-225312.sql` trước khi apply.
+
+Target được phép là duy nhất database development `agentchuan_shop`. Main agent giữ quyền apply; coder không chạy migration. Sau apply, xác minh read-only bảng/index khớp schema, `SELECT COUNT(*) FROM banners` thành công và `/api/banners?placement=HOME_HERO` trả danh sách tăng theo `sortOrder,id`. Rollback khi migration lỗi trước khi mở writer là phục hồi full backup đã xác minh; khi migration thành công nhưng cần rollback code, có thể giữ bảng additive rỗng. Không drop bảng hoặc restore nếu chưa có lệnh riêng của main agent.
+
 Runbook này chỉ áp dụng cho local development database `agentchuan_shop` và local test database `agentchuan_shop_test`. Production, staging và mọi database khác nằm ngoài ủy quyền.
 
 ## Phạm vi migration
@@ -117,6 +123,12 @@ Hai bảng có namespace operation key riêng; truy vấn cuối còn phát hi�
 Migration `20260811215500_chat_human_support` chỉ tạo `conversations`, `chat_messages`, foreign keys và các index timeline/queue; không sửa hoặc backfill Product, Order hay Promotion. Development target là `agentchuan_shop`, test target là database riêng `agentchuan_shop_test`. Không dùng `migrate reset`.
 
 Sau migrate, xác minh read-only: hai bảng tồn tại; enum/status, foreign key và index khớp schema; `_prisma_migrations` ghi migration thành công; row counts của các bảng cũ khớp manifest trước migration. Nếu verification thất bại trước khi mở writer, giữ writer dừng và khôi phục full development backup đã kiểm SHA-256 theo DB-AUTH-CHAT-001. Database test được phép làm sạch fixture và không cần backup.
+
+### SPEC-CHAT-002 additive migration
+
+Migration `20260813093000_chat_ai_assistant` chỉ thêm `activeAiRunId`, `activeAiRunStartedAt` và index `Conversation(status, activeAiRunStartedAt)` để lease một phản hồi AI đang chạy. Migration không backfill dữ liệu, không sửa Product/Order/Promotion, và không tạo secret AI trong database.
+
+Theo `DB-AUTH-CHAT-002`, migration file local dev/test được phép tạo nhưng không được apply nếu chưa có phê duyệt riêng. Kiểm thử ghi DB chỉ được chạy với `agentchuan_shop_test`; không dùng `migrate reset` và không reset dữ liệu dev/prod.
 
 ### Lỗi ứng dụng sau khi migration và data verification đã đạt
 

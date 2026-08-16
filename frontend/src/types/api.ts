@@ -19,6 +19,21 @@ export interface ApiCategory {
   children: ApiCategory[];
 }
 
+export type BannerPlacement = 'HOME_HERO';
+
+export interface ApiBanner {
+  id: number;
+  name: string;
+  imageUrl: string;
+  altText: string;
+  linkUrl: string | null;
+  placement: BannerPlacement;
+  sortOrder: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ApiProductImage {
   id: number;
   url: string;

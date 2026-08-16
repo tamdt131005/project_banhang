@@ -4,9 +4,10 @@ import type { ApiProductSummary } from '../../types/api';
 
 export interface ProductCardProps {
   product: ApiProductSummary;
+  home?: boolean;
 }
 
-export function ProductCard({ product }: Readonly<ProductCardProps>) {
+export function ProductCard({ product, home = false }: Readonly<ProductCardProps>) {
   const thumb = product.images[0]?.thumbUrl;
   const soldOut = product.stock <= 0;
 

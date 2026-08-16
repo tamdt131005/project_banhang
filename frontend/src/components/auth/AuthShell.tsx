@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { BrandLogo } from '../brand/BrandLogo';
 
 export interface AuthShellProps {
   /** Tiêu đề lớn bằng font serif — "Chào mừng trở lại", "Tạo tài khoản"... */
@@ -19,9 +20,10 @@ export function AuthShell({ title, subtitle, imageSeed, children }: Readonly<Aut
     <div className="grid min-h-[calc(100dvh-4rem)] lg:grid-cols-2">
       <div className="flex items-center justify-center px-4 py-12 md:px-10">
         <div className="w-full max-w-[420px]">
-          <p className="label-block text-ink-muted">
-            Chuẩn<span className="text-accent">.</span> — tiệm quần áo
-          </p>
+          <div className="flex items-center gap-2">
+            <BrandLogo markSize={30} wordmarkClassName="text-sm" />
+            <span className="text-xs text-ink-muted">— tiệm quần áo</span>
+          </div>
           <h1 className="mt-4 font-serif text-4xl leading-[1.1] md:text-[2.75rem]">{title}</h1>
           <p className="mt-3 text-ink-muted">{subtitle}</p>
 

@@ -138,26 +138,26 @@ export function AdminCustomersPage({}: Readonly<AdminCustomersPageProps>) {
         />
       ) : (
         <>
-          <div className="overflow-x-auto rounded-card border border-line bg-surface">
-            <table className="w-full min-w-[46rem] text-left">
-              <thead className="border-b border-line bg-sunken text-xs text-ink-muted">
+          <div className="overflow-x-auto rounded-card border border-line bg-surface shadow-xs">
+            <table className="w-full min-w-[50rem] text-left">
+              <thead className="border-b border-line bg-sunken/60 text-xs text-ink-muted">
                 <tr>
-                  <th className="p-3 font-medium">Tài khoản</th>
-                  <th className="p-3 font-medium">Liên hệ</th>
-                  <th className="p-3 text-right font-medium">Đơn hàng</th>
-                  <th className="p-3 text-right font-medium">Địa chỉ</th>
-                  <th className="p-3 text-right font-medium">Đăng ký</th>
-                  <th className="p-3" />
+                  <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[0.6875rem]">Tài khoản</th>
+                  <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[0.6875rem]">Liên hệ</th>
+                  <th className="px-4 py-3 text-right font-semibold uppercase tracking-wider text-[0.6875rem]">Đơn hàng</th>
+                  <th className="px-4 py-3 text-right font-semibold uppercase tracking-wider text-[0.6875rem]">Địa chỉ</th>
+                  <th className="px-4 py-3 text-right font-semibold uppercase tracking-wider text-[0.6875rem]">Ngày đăng ký</th>
+                  <th className="px-4 py-3 text-right font-semibold uppercase tracking-wider text-[0.6875rem]">Thao tác</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-line">
                 {users.data.items.map((user) => (
-                  <tr key={user.id} className="border-b border-line last:border-0">
-                    <td className="p-3">
+                  <tr key={user.id} className="hover:bg-sunken/40 transition-colors">
+                    <td className="px-4 py-3.5">
                       <div className="flex items-center gap-3">
                         <Avatar name={user.fullName} src={user.avatarUrl} size="sm" />
                         <div className="min-w-0">
-                          <p className="flex items-center gap-1.5 text-sm font-medium">
+                          <p className="flex items-center gap-1.5 text-sm font-semibold text-ink">
                             <span className="line-clamp-1">{user.fullName}</span>
                             {user.role === 'ADMIN' ? (
                               <span className="inline-flex shrink-0 items-center gap-1 rounded-control bg-accent-soft px-1.5 py-0.5 text-[0.625rem] font-bold text-accent">
@@ -170,23 +170,23 @@ export function AdminCustomersPage({}: Readonly<AdminCustomersPageProps>) {
                         </div>
                       </div>
                     </td>
-                    <td className="tabular p-3 text-sm text-ink-muted">{user.phone ?? '—'}</td>
-                    <td className="tabular p-3 text-right text-sm font-semibold">
+                    <td className="tabular px-4 py-3.5 text-sm text-ink-muted">{user.phone ?? '—'}</td>
+                    <td className="tabular px-4 py-3.5 text-right text-sm font-bold text-ink">
                       {user._count.orders}
                     </td>
-                    <td className="tabular p-3 text-right text-sm text-ink-muted">
+                    <td className="tabular px-4 py-3.5 text-right text-sm text-ink-muted">
                       {user._count.addresses}
                     </td>
-                    <td className="p-3 text-right text-xs whitespace-nowrap text-ink-muted">
+                    <td className="px-4 py-3.5 text-right text-xs whitespace-nowrap text-ink-muted">
                       {formatDateTime(user.createdAt)}
                     </td>
-                    <td className="p-3 text-right">
+                    <td className="px-4 py-3.5 text-right whitespace-nowrap">
                       <Link
                         to={`/admin/khach-hang/${user.id}`}
-                        className="inline-flex items-center gap-1 text-sm font-medium text-accent"
+                        className="inline-flex items-center gap-1 rounded-control border border-line bg-surface px-2.5 py-1 text-xs font-medium text-ink transition hover:border-accent hover:text-accent shadow-2xs"
                       >
-                        Chi tiết
-                        <ChevronRightIcon className="size-3.5" />
+                        <span>Chi tiết</span>
+                        <ChevronRightIcon className="size-3 text-ink-muted" />
                       </Link>
                     </td>
                   </tr>

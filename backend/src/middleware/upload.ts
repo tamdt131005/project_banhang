@@ -46,3 +46,13 @@ export const uploadAvatarImage = multer({
   },
   fileFilter: imageFileFilter,
 }).single('avatar');
+
+/** Banner có đúng một ảnh ở field "image", dùng chung giới hạn và kiểm tra ảnh. */
+export const uploadBannerImage = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: env.MAX_UPLOAD_MB * 1024 * 1024,
+    files: 1,
+  },
+  fileFilter: imageFileFilter,
+}).single('image');

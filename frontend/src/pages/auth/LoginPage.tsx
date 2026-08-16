@@ -45,7 +45,7 @@ export function LoginPage({}: Readonly<LoginPageProps>) {
     <AuthShell
       title="Chào mừng trở lại"
       subtitle="Đăng nhập để tiếp tục giỏ hàng đang dở và theo dõi đơn của bạn."
-      imageSeed="chuan-dang-nhap"
+      imageSeed="tamdang-dang-nhap"
     >
       <form onSubmit={handleSubmit} className="space-y-5">
         {message ? <Alert>{message}</Alert> : null}

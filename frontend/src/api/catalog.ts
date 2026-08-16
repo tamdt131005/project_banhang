@@ -1,4 +1,4 @@
-import type { ApiCategory, ApiPaged, ApiProductDetail, ApiProductSummary } from '../types/api';
+import type { ApiBanner, ApiCategory, ApiPaged, ApiProductDetail, ApiProductSummary } from '../types/api';
 import { api } from './client';
 
 export const PRODUCT_SORTS = ['newest', 'price-asc', 'price-desc', 'name'] as const;
@@ -30,6 +30,8 @@ export interface ApiFilterOptions {
 }
 
 export const catalogApi = {
+  banners: () => api.get<{ banners: ApiBanner[] }>('/api/banners', { placement: 'HOME_HERO' }),
+
   categories: () => api.get<{ categories: ApiCategory[] }>('/api/categories'),
 
   filterOptions: () => api.get<ApiFilterOptions>('/api/products/filter-options'),

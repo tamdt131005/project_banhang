@@ -4,6 +4,22 @@
  */
 
 export interface paths {
+    "/banners": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listPublicBanners"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/chat/conversations": {
         parameters: {
             query?: never;
@@ -11,7 +27,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        get: operations["listCustomerChatConversations"];
         put?: never;
         post: operations["createChatConversation"];
         delete?: never;
@@ -46,6 +62,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["requestChatAdmin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/chat/conversations/{id}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["closeChatConversation"];
         delete?: never;
         options?: never;
         head?: never;
@@ -308,6 +340,70 @@ export interface paths {
         patch: operations["updateAdminCategory"];
         trace?: never;
     };
+    "/admin/banners": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listAdminBanners"];
+        put?: never;
+        post: operations["createAdminBanner"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/banners/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["updateAdminBanner"];
+        trace?: never;
+    };
+    "/admin/banners/{id}/active": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["setAdminBannerActive"];
+        trace?: never;
+    };
+    "/admin/banners/{id}/image": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["replaceAdminBannerImage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/orders": {
         parameters: {
             query?: never;
@@ -482,6 +578,16 @@ export interface components {
             user: components["schemas"]["ConversationParticipant"];
             assignedAdmin: components["schemas"]["ConversationParticipant"] | null;
         };
+        CustomerConversationItem: components["schemas"]["Conversation"] & {
+            assignedAdmin: components["schemas"]["ConversationParticipant"] | null;
+            messages: {
+                id: number;
+                senderType: components["schemas"]["MessageSender"];
+                content: string;
+                /** Format: date-time */
+                createdAt: string;
+            }[];
+        };
         ChatMessage: {
             id: number;
             conversationId: number;
@@ -493,6 +599,37 @@ export interface components {
             } | null;
             /** Format: date-time */
             createdAt: string;
+        };
+        ChatProductCard: {
+            id: number;
+            name: string;
+            slug: string;
+            price: number;
+            stock: number;
+            category: {
+                id: number;
+                name: string;
+                slug: string;
+            };
+            image: {
+                url: string;
+                thumbUrl: string;
+            } | null;
+            matchingVariants: {
+                id: number;
+                size: string;
+                color: string;
+                available: boolean;
+            }[];
+        };
+        ChatAIMessageMetadata: {
+            /** @enum {string} */
+            kind?: "AI_RESPONSE" | "AI_ERROR";
+            products?: components["schemas"]["ChatProductCard"][];
+            suggestions?: string[];
+            handoffRecommended?: boolean;
+        } & {
+            [key: string]: unknown;
         };
         ChatMessageInput: {
             content: string;
@@ -509,6 +646,30 @@ export interface components {
             name: string;
             parentId?: number | null;
             sortOrder?: number;
+        };
+        /** @enum {string} */
+        BannerPlacement: "HOME_HERO";
+        Banner: {
+            id: number;
+            name: string;
+            imageUrl: string;
+            altText: string;
+            linkUrl: string | null;
+            placement: components["schemas"]["BannerPlacement"];
+            sortOrder: number;
+            isActive: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        UpdateBannerInput: {
+            name?: string;
+            altText?: string;
+            linkUrl?: string | null;
+            placement?: components["schemas"]["BannerPlacement"];
+            sortOrder?: number;
+            isActive?: boolean;
         };
         UpdateCategoryInput: {
             name?: string;
@@ -798,6 +959,57 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    listPublicBanners: {
+        parameters: {
+            query?: {
+                placement?: components["schemas"]["BannerPlacement"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Active banners in display order */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        banners: components["schemas"]["Banner"][];
+                    };
+                };
+            };
+        };
+    };
+    listCustomerChatConversations: {
+        parameters: {
+            query?: {
+                status?: components["schemas"]["ConversationStatus"];
+                page?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Customer ticket/conversation page with latest message snippet */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["CustomerConversationItem"][];
+                        pagination: components["schemas"]["Pagination"];
+                    };
+                };
+            };
+        };
+    };
     createChatConversation: {
         parameters: {
             query?: never;
@@ -863,7 +1075,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description User message committed */
+            /** @description User message committed; when AI is enabled, aiPending=true means an assistant response was safely queued after commit */
             201: {
                 headers: {
                     [name: string]: unknown;
@@ -872,6 +1084,7 @@ export interface operations {
                     "application/json": {
                         conversation: components["schemas"]["Conversation"];
                         message: components["schemas"]["ChatMessage"];
+                        aiPending?: boolean;
                     };
                 };
             };
@@ -889,6 +1102,31 @@ export interface operations {
         requestBody?: never;
         responses: {
             /** @description Human support requested or idempotently replayed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        conversation: components["schemas"]["Conversation"];
+                        message: components["schemas"]["ChatMessage"];
+                    };
+                };
+            };
+        };
+    };
+    closeChatConversation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Customer conversation closed or idempotently replayed */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -1454,6 +1692,152 @@ export interface operations {
                 content: {
                     "application/json": {
                         category: components["schemas"]["Category"];
+                    };
+                };
+            };
+        };
+    };
+    listAdminBanners: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description All banners */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        banners: components["schemas"]["Banner"][];
+                    };
+                };
+            };
+        };
+    };
+    createAdminBanner: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    name: string;
+                    altText: string;
+                    linkUrl?: string | null;
+                    placement?: components["schemas"]["BannerPlacement"];
+                    sortOrder?: number;
+                    isActive?: boolean;
+                    /** Format: binary */
+                    image: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Banner created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        banner: components["schemas"]["Banner"];
+                    };
+                };
+            };
+        };
+    };
+    updateAdminBanner: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateBannerInput"];
+            };
+        };
+        responses: {
+            /** @description Banner updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        banner: components["schemas"]["Banner"];
+                    };
+                };
+            };
+        };
+    };
+    setAdminBannerActive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    isActive: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Banner visibility updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        banner: components["schemas"]["Banner"];
+                    };
+                };
+            };
+        };
+    };
+    replaceAdminBannerImage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    image: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Banner image replaced */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        banner: components["schemas"]["Banner"];
                     };
                 };
             };

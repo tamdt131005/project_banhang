@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
-  title: AgentChuan Admin API
-  version: 0.5.0
-  description: Source-of-truth transport contract for SPEC-BE-001, SPEC-FE-002, and SPEC-CHAT-001.
+  title: Tâm Đặng Admin API
+  version: 0.6.0
+  description: Source-of-truth transport contract including SPEC-BANNER-001 v0.4.
 servers:
   - url: http://localhost:4000/api
 security:
@@ -55,6 +55,26 @@ components:
               oneOf:
                 - $ref: '#/components/schemas/ConversationParticipant'
                 - type: 'null'
+    CustomerConversationItem:
+      allOf:
+        - $ref: '#/components/schemas/Conversation'
+        - type: object
+          required: [assignedAdmin, messages]
+          properties:
+            assignedAdmin:
+              oneOf:
+                - $ref: '#/components/schemas/ConversationParticipant'
+                - type: 'null'
+            messages:
+              type: array
+              items:
+                type: object
+                required: [id, senderType, content, createdAt]
+                properties:
+                  id: { type: integer }
+                  senderType: { $ref: '#/components/schemas/MessageSender' }
+                  content: { type: string }
+                  createdAt: { type: string, format: date-time }
     ChatMessage:
       type: object
       required: [id, conversationId, senderType, senderUserId, content, metadata, createdAt]
@@ -66,6 +86,52 @@ components:
         content: { type: string }
         metadata: { type: [object, 'null'], additionalProperties: true }
         createdAt: { type: string, format: date-time }
+    ChatProductCard:
+      type: object
+      additionalProperties: false
+      required: [id, name, slug, price, stock, category, image, matchingVariants]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        slug: { type: string }
+        price: { type: number }
+        stock: { type: integer }
+        category:
+          type: object
+          additionalProperties: false
+          required: [id, name, slug]
+          properties:
+            id: { type: integer }
+            name: { type: string }
+            slug: { type: string }
+        image:
+          oneOf:
+            - type: object
+              additionalProperties: false
+              required: [url, thumbUrl]
+              properties:
+                url: { type: string }
+                thumbUrl: { type: string }
+            - type: 'null'
+        matchingVariants:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [id, size, color, available]
+            properties:
+              id: { type: integer }
+              size: { type: string }
+              color: { type: string }
+              available: { type: boolean }
+    ChatAIMessageMetadata:
+      type: object
+      additionalProperties: true
+      properties:
+        kind: { type: string, enum: [AI_RESPONSE, AI_ERROR] }
+        products: { type: array, items: { $ref: '#/components/schemas/ChatProductCard' } }
+        suggestions: { type: array, items: { type: string } }
+        handoffRecommended: { type: boolean }
     ChatMessageInput:
       type: object
       additionalProperties: false
@@ -89,6 +155,31 @@ components:
         name: { type: string }
         parentId: { type: [integer, 'null'] }
         sortOrder: { type: integer }
+    BannerPlacement: { type: string, enum: [HOME_HERO] }
+    Banner:
+      type: object
+      required: [id, name, imageUrl, altText, linkUrl, placement, sortOrder, isActive, createdAt, updatedAt]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        imageUrl: { type: string }
+        altText: { type: string }
+        linkUrl: { type: [string, 'null'] }
+        placement: { $ref: '#/components/schemas/BannerPlacement' }
+        sortOrder: { type: integer, minimum: 0 }
+        isActive: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    UpdateBannerInput:
+      type: object
+      additionalProperties: false
+      properties:
+        name: { type: string }
+        altText: { type: string }
+        linkUrl: { type: [string, 'null'] }
+        placement: { $ref: '#/components/schemas/BannerPlacement' }
+        sortOrder: { type: integer, minimum: 0 }
+        isActive: { type: boolean }
     UpdateCategoryInput:
       type: object
       additionalProperties: false
@@ -412,7 +503,30 @@ components:
   responses:
     Error: { description: Request failed, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
 paths:
+  /banners:
+    get:
+      security: []
+      operationId: listPublicBanners
+      parameters: [{ name: placement, in: query, schema: { $ref: '#/components/schemas/BannerPlacement' } }]
+      responses: { '200': { description: Active banners in display order, content: { application/json: { schema: { type: object, required: [banners], properties: { banners: { type: array, items: { $ref: '#/components/schemas/Banner' } } } } } } } }
   /chat/conversations:
+    get:
+      operationId: listCustomerChatConversations
+      parameters:
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/ConversationStatus' } }
+        - { name: page, in: query, schema: { type: integer } }
+        - { name: limit, in: query, schema: { type: integer } }
+      responses:
+        '200':
+          description: Customer ticket/conversation page with latest message snippet
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, pagination]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/CustomerConversationItem' } }
+                  pagination: { $ref: '#/components/schemas/Pagination' }
     post:
       operationId: createChatConversation
       responses:
@@ -428,13 +542,19 @@ paths:
       parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
       requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ChatMessageInput' } } } }
       responses:
-        '201': { description: User message committed, content: { application/json: { schema: { type: object, required: [conversation, message], properties: { conversation: { $ref: '#/components/schemas/Conversation' }, message: { $ref: '#/components/schemas/ChatMessage' } } } } } }
+        '201': { description: 'User message committed; when AI is enabled, aiPending=true means an assistant response was safely queued after commit', content: { application/json: { schema: { type: object, required: [conversation, message], properties: { conversation: { $ref: '#/components/schemas/Conversation' }, message: { $ref: '#/components/schemas/ChatMessage' }, aiPending: { type: boolean } } } } } }
   /chat/conversations/{id}/request-admin:
     post:
       operationId: requestChatAdmin
       parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
       responses:
         '200': { description: Human support requested or idempotently replayed, content: { application/json: { schema: { type: object, required: [conversation, message], properties: { conversation: { $ref: '#/components/schemas/Conversation' }, message: { $ref: '#/components/schemas/ChatMessage' } } } } } }
+  /chat/conversations/{id}/close:
+    post:
+      operationId: closeChatConversation
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '200': { description: Customer conversation closed or idempotently replayed, content: { application/json: { schema: { type: object, required: [conversation, message], properties: { conversation: { $ref: '#/components/schemas/Conversation' }, message: { $ref: '#/components/schemas/ChatMessage' } } } } } }
   /admin/chat/conversations:
     get:
       operationId: listAdminChatConversations
@@ -554,6 +674,46 @@ paths:
       operationId: deleteAdminCategory
       parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
       responses: { '204': { description: Category deleted } }
+  /admin/banners:
+    get:
+      operationId: listAdminBanners
+      responses: { '200': { description: All banners, content: { application/json: { schema: { type: object, required: [banners], properties: { banners: { type: array, items: { $ref: '#/components/schemas/Banner' } } } } } } } }
+    post:
+      operationId: createAdminBanner
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [name, altText, image]
+              properties:
+                name: { type: string }
+                altText: { type: string }
+                linkUrl: { type: [string, 'null'] }
+                placement: { $ref: '#/components/schemas/BannerPlacement' }
+                sortOrder: { type: integer, minimum: 0 }
+                isActive: { type: boolean }
+                image: { type: string, format: binary }
+      responses: { '201': { description: Banner created, content: { application/json: { schema: { type: object, required: [banner], properties: { banner: { $ref: '#/components/schemas/Banner' } } } } } } }
+  /admin/banners/{id}:
+    patch:
+      operationId: updateAdminBanner
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/UpdateBannerInput' } } } }
+      responses: { '200': { description: Banner updated, content: { application/json: { schema: { type: object, required: [banner], properties: { banner: { $ref: '#/components/schemas/Banner' } } } } } } }
+  /admin/banners/{id}/active:
+    patch:
+      operationId: setAdminBannerActive
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [isActive], properties: { isActive: { type: boolean } } } } } }
+      responses: { '200': { description: Banner visibility updated, content: { application/json: { schema: { type: object, required: [banner], properties: { banner: { $ref: '#/components/schemas/Banner' } } } } } } }
+  /admin/banners/{id}/image:
+    post:
+      operationId: replaceAdminBannerImage
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { multipart/form-data: { schema: { type: object, required: [image], properties: { image: { type: string, format: binary } } } } } }
+      responses: { '200': { description: Banner image replaced, content: { application/json: { schema: { type: object, required: [banner], properties: { banner: { $ref: '#/components/schemas/Banner' } } } } } } }
   /admin/orders:
     get:
       operationId: listAdminOrders

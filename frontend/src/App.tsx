@@ -5,6 +5,7 @@ import { AuthLayout } from './components/layout/AuthLayout';
 import { ShopLayout } from './components/layout/ShopLayout';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { AdminCategoriesPage } from './pages/admin/AdminCategoriesPage';
+import { AdminBannersPage } from './pages/admin/AdminBannersPage';
 import { AdminCustomerDetailPage } from './pages/admin/AdminCustomerDetailPage';
 import { AdminCustomersPage } from './pages/admin/AdminCustomersPage';
 import { AdminDashboardPage } from './pages/admin/AdminDashboardPage';
@@ -73,6 +74,7 @@ export default function App({}: Readonly<AppProps>) {
           <Route path="san-pham/:id" element={<AdminProductFormPage />} />
           <Route path="kho" element={<AdminInventoryPage />} />
           <Route path="danh-muc" element={<AdminCategoriesPage />} />
+          <Route path="banner" element={<AdminBannersPage />} />
           <Route path="don-hang" element={<AdminOrdersPage />} />
           <Route path="don-hang/:code" element={<AdminOrderDetailPage />} />
           <Route path="ho-tro" element={<AdminSupportPage />} />

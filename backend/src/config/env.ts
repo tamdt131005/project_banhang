@@ -1,37 +1,53 @@
 import 'dotenv/config';
 import { z } from 'zod';
 
-const envSchema = z.object({
-  NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
-  PORT: z.coerce.number().int().positive().default(4000),
+const booleanEnv = (defaultValue: boolean) =>
+  z
+    .enum(['true', 'false', '1', '0'])
+    .default(defaultValue ? 'true' : 'false')
+    .transform((value) => value === 'true' || value === '1');
 
-  DATABASE_URL: z.string().min(1, 'thiếu chuỗi kết nối database'),
+const envSchema = z
+  .object({
+    NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+    PORT: z.coerce.number().int().positive().default(4000),
 
-  CORS_ORIGIN: z.string().min(1).default('http://localhost:5173'),
+    DATABASE_URL: z.string().min(1, 'thiếu chuỗi kết nối database'),
 
-  /**
-   * Số tầng proxy tin cậy phía trước server. Mặc định 0 = không tin ai, nên
-   * `req.ip` luôn là địa chỉ TCP thật. Chỉ tăng lên khi thực sự chạy sau
-   * nginx/Cloudflare — bật bừa sẽ cho phép giả mạo IP qua X-Forwarded-For và
-   * vô hiệu hoá toàn bộ rate limit.
-   */
-  TRUST_PROXY: z.coerce.number().int().min(0).default(0),
+    CORS_ORIGIN: z.string().min(1).default('http://localhost:5173'),
 
-  JWT_ACCESS_SECRET: z.string().min(16, 'cần ít nhất 16 ký tự'),
-  JWT_REFRESH_SECRET: z.string().min(16, 'cần ít nhất 16 ký tự'),
-  ACCESS_TOKEN_TTL: z.string().min(1).default('15m'),
-  REFRESH_TOKEN_TTL: z.string().min(1).default('7d'),
+    /**
+     * Số tầng proxy tin cậy phía trước server. Mặc định 0 = không tin ai, nên
+     * `req.ip` luôn là địa chỉ TCP thật. Chỉ tăng lên khi thực sự chạy sau
+     * nginx/Cloudflare — bật bừa sẽ cho phép giả mạo IP qua X-Forwarded-For và
+     * vô hiệu hoá toàn bộ rate limit.
+     */
+    TRUST_PROXY: z.coerce.number().int().min(0).default(0),
 
-  UPLOAD_DIR: z.string().min(1).default('uploads'),
-  MAX_UPLOAD_MB: z.coerce.number().int().positive().default(5),
+    JWT_ACCESS_SECRET: z.string().min(16, 'cần ít nhất 16 ký tự'),
+    JWT_REFRESH_SECRET: z.string().min(16, 'cần ít nhất 16 ký tự'),
+    ACCESS_TOKEN_TTL: z.string().min(1).default('15m'),
+    REFRESH_TOKEN_TTL: z.string().min(1).default('7d'),
 
-  SHIPPING_FEE: z.coerce.number().int().nonnegative().default(30_000),
+    UPLOAD_DIR: z.string().min(1).default('uploads'),
+    MAX_UPLOAD_MB: z.coerce.number().int().positive().default(5),
 
-  MOMO_PARTNER_CODE: z.string().default(''),
-  MOMO_ACCESS_KEY: z.string().default(''),
-  MOMO_SECRET_KEY: z.string().default(''),
-  MOMO_ENDPOINT: z.string().default(''),
-});
+    SHIPPING_FEE: z.coerce.number().int().nonnegative().default(30_000),
+
+    AI_CHAT_ENABLED: booleanEnv(false),
+    CUSTOM_AI_BASE_URL: z.string().url().default('http://localhost:20128/v1'),
+    CUSTOM_AI_API_KEY: z.string().default(''),
+    CUSTOM_AI_MODEL: z.string().min(1).default('gemini/gemma-4-31b-it'),
+    AI_CHAT_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(60_000).default(15_000),
+    AI_CHAT_MAX_TOOL_ITERATIONS: z.coerce.number().int().min(1).max(8).default(5),
+    AI_CHAT_CONTEXT_MESSAGES: z.coerce.number().int().min(4).max(30).default(16),
+    AI_CHAT_STALE_MS: z.coerce.number().int().min(10_000).max(600_000).default(120_000),
+
+    MOMO_PARTNER_CODE: z.string().default(''),
+    MOMO_ACCESS_KEY: z.string().default(''),
+    MOMO_SECRET_KEY: z.string().default(''),
+    MOMO_ENDPOINT: z.string().default(''),
+  });
 
 const parsed = envSchema.safeParse(process.env);
 

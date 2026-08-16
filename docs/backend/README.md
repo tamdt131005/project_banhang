@@ -2,15 +2,24 @@
 
 Tài liệu này mô tả contract backend đã chốt cho tính toàn vẹn trạng thái đơn hàng và tồn kho. OpenAPI máy đọc được nằm tại [openapi.yaml](./openapi.yaml); quy trình dữ liệu nằm tại [database.md](./database.md).
 
-## Chat và human support V1
+## Banner trang chủ — SPEC-BANNER-001 v0.4
+
+- `GET /api/banners?placement=HOME_HERO` công khai, chỉ trả banner đang bật theo `sortOrder`, rồi `id` tăng dần.
+- `/api/admin/banners` yêu cầu admin: xem tất cả, tạo bằng multipart field `image`, sửa metadata/thứ tự/vị trí, bật tắt và thay ảnh. Không có thao tác xoá.
+- `linkUrl` chỉ nhận đường dẫn nội bộ bắt đầu bằng `/` hoặc URL `http(s)`; scheme thực thi như `javascript:` bị từ chối.
+- Ảnh được giải mã và nén WebP bằng Sharp. Tệp mới được dọn khi ghi database thất bại; khi thay ảnh, tệp cũ chỉ bị xoá sau khi database đã lưu đường dẫn mới.
+
+## Chat, AI router và human support
 
 - Tất cả REST chat yêu cầu cookie `access_token`; server luôn suy ra customer/admin từ JWT, không nhận danh tính người gửi từ body.
-- Customer có thể tạo nhiều conversation. `AI` là trạng thái self-service tương thích AI trong tương lai; V1 chỉ lưu tin nhắn USER và không tạo phản hồi AI giả.
-- Chuyển trạng thái: `AI -> WAITING_ADMIN -> LIVE -> CLOSED`; `AI -> CLOSED` dành cho trường hợp cần đóng sớm. Không reopen.
+- Customer có thể tạo nhiều conversation và liệt kê danh sách ticket/conversation của mình qua `GET /api/chat/conversations`. Ở trạng thái `AI`, backend có thể gọi AI provider qua endpoint OpenAI-compatible server-side nếu `AI_CHAT_ENABLED=true`; nếu tắt AI, luồng vẫn lưu tin nhắn USER và cho phép yêu cầu nhân viên.
+- Chuyển trạng thái: `AI -> WAITING_ADMIN -> LIVE -> CLOSED`; `AI -> CLOSED`, `WAITING_ADMIN -> CLOSED`, `LIVE -> CLOSED` (từ customer hoặc admin được phân công) dành cho trường hợp cần đóng/hủy kết nối nhân viên để quay lại dùng chatbot AI. Không reopen.
 - Accept claim có điều kiện `WAITING_ADMIN && assignedAdminId IS NULL`; assignment, trạng thái và SYSTEM message cùng transaction.
 - REST/service là writer duy nhất. Socket.IO chỉ xác thực bằng cookie httpOnly hiện có, kiểm tra quyền mỗi lần join room, và phát event sau commit.
 - Room: `conversation:{id}`, `support:admins`. Client commands: `conversation:join`, `support:subscribe`. Server events: `conversation.created`, `message.created`, `support.requested`, `support.accepted`, `conversation.closed`.
-- V1 không có Gemini, `GEMINI_API_KEY`, promotion hay return-policy tool. Các interface `AIProvider`, `AIOrchestrator` và tool registry là seam chưa nối provider.
+- AI endpoint/key chỉ nằm ở backend; frontend không nhận key và chỉ render text/product cards đã được backend chuẩn hóa. Response `POST /chat/conversations/{id}/messages` có thể trả `aiPending=true` khi phản hồi AI đã được queue sau commit.
+- AI tool registry là allow-list server-side: tìm/xem sản phẩm, kiểm tra tồn, đọc đơn hàng thuộc đúng customer, thông tin giao/đổi trả, và chuyển sang human support. Tool không được ghi ngoài phạm vi chat handoff đã kiểm soát.
+- Mỗi conversation chỉ có một AI run active thông qua `activeAiRunId`/`activeAiRunStartedAt`; run mới bị chặn khi run cũ còn fresh, run trễ hoặc sai lease không được ghi tin nhắn AI.
 
 ## Nguyên tắc thực thi
 

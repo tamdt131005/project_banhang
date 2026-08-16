@@ -412,15 +412,15 @@ export function AdminInventoryPage({}: Readonly<AdminInventoryPageProps>) {
         />
       ) : (
         <>
-          <div className="overflow-x-auto rounded-card border border-line bg-surface">
-            <table className="w-full min-w-[44rem] text-left">
-              <thead className="border-b border-line bg-sunken text-xs text-ink-muted">
+          <div className="overflow-x-auto rounded-card border border-line bg-surface shadow-xs">
+            <table className="w-full min-w-[48rem] text-left">
+              <thead className="border-b border-line bg-sunken/60 text-xs text-ink-muted">
                 <tr>
-                  <th className="p-3 font-medium">Sản phẩm</th>
-                  <th className="p-3 font-medium">Biến thể</th>
-                  <th className="p-3 text-right font-medium">Giá</th>
-                  <th className="p-3 text-right font-medium">Tồn kho</th>
-                  <th className="p-3 text-right font-medium">Cập nhật</th>
+                  <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[0.6875rem]">Sản phẩm</th>
+                  <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[0.6875rem]">Biến thể</th>
+                  <th className="px-4 py-3 text-right font-semibold uppercase tracking-wider text-[0.6875rem]">Giá bán</th>
+                  <th className="px-4 py-3 text-right font-semibold uppercase tracking-wider text-[0.6875rem]">Tồn kho</th>
+                  <th className="px-4 py-3 text-right font-semibold uppercase tracking-wider text-[0.6875rem]">Cập nhật</th>
                 </tr>
               </thead>
               <tbody>

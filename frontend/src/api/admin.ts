@@ -1,6 +1,7 @@
 import type { InventoryMovementType, OrderStatus } from '../lib/format';
 import type {
   ApiAddress,
+  ApiBanner,
   ApiCategory,
   ApiOrder,
   ApiPaged,
@@ -62,6 +63,10 @@ const adminPaths = {
   productImage: '/admin/product-images/{id}',
   categories: '/admin/categories',
   category: '/admin/categories/{id}',
+  banners: '/admin/banners',
+  banner: '/admin/banners/{id}',
+  bannerActive: '/admin/banners/{id}/active',
+  bannerImage: '/admin/banners/{id}/image',
   orders: '/admin/orders',
   order: '/admin/orders/{code}',
   orderStatus: '/admin/orders/{id}/status',
@@ -114,6 +119,15 @@ export interface CategoryInput {
   name: string;
   parentId?: number | null;
   sortOrder?: number;
+}
+
+export interface BannerInput {
+  name: string;
+  altText: string;
+  linkUrl?: string | null;
+  placement: 'HOME_HERO';
+  sortOrder: number;
+  isActive: boolean;
 }
 
 /** Đơn hàng phía admin có kèm thông tin người đặt. */
@@ -405,6 +419,34 @@ const adminApi = {
 
   removeCategory: (id: number) => api.delete<void>(`/api${bindPath(adminPaths.category, id)}`),
 
+  banners: () => api.get<JsonResponse<'/admin/banners', 'get', 200>>(`/api${adminPaths.banners}`),
+
+  createBanner: (input: BannerInput, file: File) => {
+    const form = new FormData();
+    const body = { ...input, image: file.name } satisfies MultipartRequestBody<'/admin/banners', 'post'>;
+    for (const [key, value] of Object.entries(body)) form.append(key, key === 'image' ? file : String(value ?? ''));
+    return api.post<JsonResponse<'/admin/banners', 'post', 201>>(`/api${adminPaths.banners}`, form);
+  },
+
+  updateBanner: (id: number, input: BannerInput) =>
+    api.patch<JsonResponse<'/admin/banners/{id}', 'patch', 200>>(
+      `/api${bindPath(adminPaths.banner, id)}`,
+      input satisfies JsonRequestBody<'/admin/banners/{id}', 'patch'>,
+    ),
+
+  setBannerActive: (id: number, isActive: boolean) =>
+    api.patch<JsonResponse<'/admin/banners/{id}/active', 'patch', 200>>(
+      `/api${bindPath(adminPaths.bannerActive, id)}`,
+      { isActive } satisfies JsonRequestBody<'/admin/banners/{id}/active', 'patch'>,
+    ),
+
+  replaceBannerImage: (id: number, file: File) => {
+    const form = new FormData();
+    const body = { image: file.name } satisfies MultipartRequestBody<'/admin/banners/{id}/image', 'post'>;
+    form.append('image', file);
+    return api.post<JsonResponse<'/admin/banners/{id}/image', 'post', 200>>(`/api${bindPath(adminPaths.bannerImage, id)}`, form);
+  },
+
   orders: (query: AdminOrderQuery = {}) => {
     const contractQuery = {
       search: query.search,
@@ -515,6 +557,13 @@ interface AdminGateway {
     update(id: number, input: Partial<CategoryInput>): Promise<{ category: ApiCategory }>;
     remove(id: number): Promise<void>;
   };
+  banners: {
+    list(): Promise<{ banners: ApiBanner[] }>;
+    create(input: BannerInput, file: File): Promise<{ banner: ApiBanner }>;
+    update(id: number, input: BannerInput): Promise<{ banner: ApiBanner }>;
+    setActive(id: number, isActive: boolean): Promise<{ banner: ApiBanner }>;
+    replaceImage(id: number, file: File): Promise<{ banner: ApiBanner }>;
+  };
   orders: {
     list(query?: AdminOrderQuery): Promise<ApiPaged<AdminOrder>>;
     detail(code: string): Promise<{ order: AdminOrder }>;
@@ -550,6 +599,7 @@ export const adminGateway: AdminGateway = {
     reorderImages: adminApi.reorderImages,
   },
   categories: { list: adminApi.categories, create: adminApi.createCategory, update: adminApi.updateCategory, remove: adminApi.removeCategory },
+  banners: { list: adminApi.banners, create: adminApi.createBanner, update: adminApi.updateBanner, setActive: adminApi.setBannerActive, replaceImage: adminApi.replaceBannerImage },
   orders: { list: adminApi.orders, detail: adminApi.order, setStatus: adminApi.setOrderStatus, setPaymentStatus: adminApi.setPaymentStatus },
   users: { list: adminApi.users, detail: adminApi.user, setRole: adminApi.setUserRole, revokeSessions: adminApi.revokeSessions },
   chat: {

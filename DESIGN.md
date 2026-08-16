@@ -1,4 +1,4 @@
-# Design System: CHUẨN — tiệm quần áo trực tuyến
+# Design System: TÂM ĐẶNG — tiệm quần áo trực tuyến
 
 Tài liệu này là **nguồn sự thật duy nhất** cho mọi component React trong `frontend/`. Sửa thiết kế thì sửa ở đây trước, rồi mới sửa code.
 
@@ -8,7 +8,9 @@ Token màu và font được khai báo một lần ở `frontend/src/index.css` 
 >
 > **Phiên bản 2.1 — lớp hoàn thiện "premium" theo mẫu khách chọn:** tiêu đề lớn dùng serif `Playfair Display`, nút chuyển hết sang dạng pill (bo tròn hẳn), ô nhập kiểu "filled bottom-line" (nền chìm, chỉ viền dưới), nav header CHỮ HOA giãn chữ, footer nhiều cột, trang đăng nhập/đăng ký chia đôi màn hình với ảnh tràn mép. Mua bán theo **biến thể size × màu** — tồn kho nằm trên từng biến thể.
 >
-> **Phiên bản 2.3 — góc vuông kiểu sàn TMĐT (khách chọn, thay pill của v2.1):** token bán kính hạ về `--radius-card: 0.25rem` và `--radius-control: 0.25rem`. Mọi nút, chip, ô nhập, stepper, phân trang dùng `rounded-control` (4px) — KHÔNG pill. `rounded-full` chỉ còn cho: avatar, nút icon tròn (giỏ, theme, đóng dialog), badge nhỏ (trạng thái đơn, "Mặc định", số trên giỏ) và vòng tròn icon minh hoạ (lối tắt trang chủ, timeline, EmptyState). Icon SVG nét mảnh phủ khắp trang; menu/flyout dùng hàng phủ kín mép panel, không bo lồng trong bo. Thẻ sản phẩm KHÔNG có lớp phủ hover "Xem chi tiết".
+> **Phiên bản 2.4 — banner quản trị được + card trang chủ 2px:** hero trang chủ lấy banner `HOME_HERO` đang bật từ backend, tự chuyển mỗi 5 giây theo hướng trái sang phải, có mũi tên/chấm và dừng khi hover/focus; reduced-motion tắt autoplay. Riêng card sản phẩm và skeleton trên trang chủ bo `2px`; các trang khác giữ token `--radius-card: 0.25rem`.
+>
+> **Phiên bản 2.5 — nhận diện Tâm Đặng:** logo dùng monogram TD SVG nguyên bản và wordmark TÂM ĐẶNG, đồng bộ ở cửa hàng, đăng nhập và admin.
 
 ---
 
@@ -16,7 +18,8 @@ Token màu và font được khai báo một lần ở `frontend/src/index.css` 
 
 | | |
 |---|---|
-| **Tên hiệu** | `CHUẨN` — viết hoa toàn bộ, đậm 700, giãn chữ `-0.02em`, kèm dấu chấm màu nhấn: **CHUẨN.** |
+| **Tên hiệu** | `TÂM ĐẶNG` — viết hoa toàn bộ, đậm 700, giãn chữ `-0.02em`, không có dấu chấm cuối |
+| **Logo** | Monogram `TD` nét sáng trong huy hiệu vuông bo mềm; nền chuyển cam `#FF7A1A` → `#F4511E`, viền cam đậm, highlight mép trên và chiều sâu rất nhẹ |
 | **Tagline** | "Đồ cơ bản, đúng dáng" |
 | **Bán gì** | Quần áo nam nữ hằng ngày + phụ kiện. Không phải sàn tổng hợp — mọi copy nói về đồ mặc |
 
@@ -122,7 +125,7 @@ Chữ thân tối thiểu `14px`, dòng cao `1.5`, đoạn dài giới hạn `65
 
 ### Thẻ sản phẩm — component quan trọng nhất
 
-Nền `Mặt Thẻ`, viền `1px` `Viền Mảnh`, bo `0.5rem`, không đổ bóng khi nghỉ.
+Nền `Mặt Thẻ`, viền `1px` `Viền Mảnh`, bo theo `--radius-card`, không đổ bóng khi nghỉ. Riêng hai lưới sản phẩm trang chủ bo `2px` theo lựa chọn khách hàng.
 
 - **Ảnh DỌC tỉ lệ 4:5** (`aspect-[4/5]`), `object-fit: cover` — quần áo chụp người đứng, khung dọc mới cho thấy dáng. Đây là khác biệt lớn nhất so với bản 1 (ảnh vuông của đồ gia dụng)
 - **Hover ảnh phóng nhẹ `scale(1.05)` trong `240ms`** bên trong khung bị cắt (`overflow-hidden`) — ngôn ngữ quen thuộc của web thời trang, chỉ dùng `transform` nên không tính lại bố cục
@@ -167,7 +170,9 @@ Chip vuông (4px) như chip danh mục: nghỉ viền `Viền Mảnh`; đang ch�
 
 ### Header (v2.1)
 
-Cao `4rem`, dính đỉnh, nền đục. Trái → phải: logo CHUẨN. (đậm 700, giãn `-0.03em`, dấu chấm màu nhấn) · nav CHỮ HOA cỡ `0.75rem` giãn `+0.12em` màu `Mực Nhạt` (ẩn dưới `lg`) — toàn bộ là link thật: Hàng mới, Đồ nam (▾ flyout con), Đồ nữ (▾), Phụ kiện (▾) · ô tìm kiếm vuông có icon kính lúp · icon giỏ SVG kèm badge số · avatar menu (đã đăng nhập) hoặc Đăng nhập (chữ) + Đăng ký (nút vuông nhấn) · nút icon đổi giao diện. Di động: tìm kiếm rơi xuống hàng riêng.
+Cao `4rem`, dính đỉnh, nền đục. Trái → phải: monogram TD `34px` + wordmark TÂM ĐẶNG (đậm 700, giãn `-0.03em`; chữ ĐẶNG dùng màu nhấn) · nav CHỮ HOA cỡ `0.75rem` giãn `+0.12em` màu `Mực Nhạt` (ẩn dưới `lg`) — toàn bộ là link thật: Hàng mới, Đồ nam (▾ flyout con), Đồ nữ (▾), Phụ kiện (▾) · ô tìm kiếm vuông có icon kính lúp · icon giỏ SVG kèm badge số · avatar menu (đã đăng nhập) hoặc Đăng nhập (chữ) + Đăng ký (nút vuông nhấn) · nút icon đổi giao diện. Di động: tìm kiếm rơi xuống hàng riêng.
+
+Logo luôn dùng component SVG chung, giữ monogram ở `24–40px`, không kéo méo hoặc đổi riêng màu từng trang. Nền cam có chiều sâu nhẹ nhờ lớp đế, viền, highlight và shadow; không thêm hiệu ứng 3D mạnh. Wordmark dùng `Mực Đậm` + màu nhấn nên tương phản ở cả giao diện sáng và tối. Favicon chỉ dùng monogram, không nhét wordmark vào kích thước nhỏ.
 
 ### Footer (v2.1)
 
@@ -213,7 +218,7 @@ Khe `0.75rem` di động, `1rem` máy tính. Lưới đều tăm tắp — ngư�
 
 Từ trên xuống — mọi khối bấm được đều dẫn tới bộ lọc thật:
 
-1. **Lookbook hero khổ lớn**: một mảng ảnh cao `340px` (di động) → `420px`, chữ nằm trong dải gradient tối bên trái (heading serif + tagline + đúng một CTA "Mua ngay"). Đây là "điểm dừng thị giác" — cả trang chỉ có một mảng như vậy. Không băng chuyền tự chạy.
+1. **Banner hero khổ lớn**: danh sách ảnh `HOME_HERO` cao `340px` (di động) → `420px`, lấy từ database và ẩn cả vùng nếu không có banner đang bật. Banner tự chuyển vòng lặp mỗi 5 giây, ảnh đi từ trái sang phải; có mũi tên/chấm, dừng khi hover/focus và không autoplay với reduced-motion.
 2. **Dải lối tắt** (v2.3): 5 vòng tròn icon màu nhạt — Hàng mới về / Đồ nam / Đồ nữ / Phụ kiện / Đơn mua — nhấc `-4px` khi hover, mọi ô là link thật.
 3. **Ba cổng đối tượng** `Đồ nam / Đồ nữ / Phụ kiện`: ảnh dọc + nhãn CHỮ HOA trên gradient đáy, ảnh phóng nhẹ khi hover. Link theo categoryId thật.
 4. **Hàng chip danh mục** cuộn ngang — toàn bộ danh mục con, bấm là lọc.
@@ -240,7 +245,7 @@ Từ trên xuống — mọi khối bấm được đều dẫn tới bộ lọc
 
 Không dùng `linear` cho bất cứ thứ gì nhìn thấy được.
 
-**Vòng lặp vô hạn: chỉ duy nhất skeleton đang tải.** Bản 1 còn cho phép băng chuyền banner và badge flash-sale tự chạy; bản 2 cắt nốt — hero giờ là ảnh tĩnh, và không có khu flash-sale nào cả. Một trang đứng yên thì không được có gì tự động cử động. Đây là cách "chuyển động mượt, tránh lag" được thực thi triệt để nhất.
+**Vòng lặp vô hạn:** skeleton đang tải và banner trang chủ đã được khách phê duyệt. Banner dùng chu kỳ 5 giây, tạm dừng khi hover/focus và tắt autoplay với `prefers-reduced-motion`; không có badge hoặc flash-sale tự chạy.
 
 ---
 

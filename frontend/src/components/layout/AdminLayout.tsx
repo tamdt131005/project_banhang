@@ -1,8 +1,10 @@
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { BrandLogo } from '../brand/BrandLogo';
 import { Avatar } from '../ui/Avatar';
 import {
   BoxIcon,
+  CameraIcon,
   ChevronRightIcon,
   GaugeIcon,
   MessageIcon,
@@ -42,6 +44,7 @@ const GROUPS = [
       { to: '/admin/san-pham', label: 'Sản phẩm', icon: <BoxIcon />, end: false },
       { to: '/admin/kho', label: 'Kho hàng', icon: <WarehouseIcon />, end: false },
       { to: '/admin/danh-muc', label: 'Danh mục', icon: <TagIcon />, end: false },
+      { to: '/admin/banner', label: 'Banner', icon: <CameraIcon />, end: false },
     ],
   },
 ];
@@ -76,13 +79,11 @@ export function AdminLayout({ className = '' }: Readonly<AdminLayoutProps>) {
     }`;
 
   return (
-    <div className={`flex min-h-[100dvh] ${className}`}>
+    <div className={`flex h-screen overflow-hidden ${className}`}>
       {/* Sidebar máy tính — cao hết màn hình, cuộn riêng phần nav. */}
-      <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col border-r border-line bg-surface lg:flex">
+      <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r border-line bg-surface lg:flex">
         <Link to="/" className="flex h-16 shrink-0 items-center gap-2 border-b border-line px-5">
-          <span className="text-lg font-bold tracking-[-0.03em] uppercase">
-            Chuẩn<span className="text-accent">.</span>
-          </span>
+          <BrandLogo markSize={32} />
           <span className="rounded-control bg-accent-soft px-1.5 py-0.5 text-[0.625rem] font-bold tracking-wider text-accent uppercase">
             Admin
           </span>
@@ -129,9 +130,9 @@ export function AdminLayout({ className = '' }: Readonly<AdminLayoutProps>) {
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Top bar riêng của khu quản trị. */}
         <header className="sticky top-0 z-20 border-b border-line bg-surface">
-          <div className="flex h-16 items-center gap-3 px-4 sm:px-6">
-            <Link to="/" className="text-lg font-bold tracking-[-0.03em] uppercase lg:hidden">
-              Chuẩn<span className="text-accent">.</span>
+          <div className="mx-auto flex h-16 w-full max-w-[1280px] items-center gap-3 px-4 sm:px-6">
+            <Link to="/" className="lg:hidden">
+              <BrandLogo markSize={30} wordmarkClassName="hidden text-base sm:inline" />
             </Link>
 
             <div className="hidden items-center gap-1.5 text-sm lg:flex">
@@ -156,7 +157,7 @@ export function AdminLayout({ className = '' }: Readonly<AdminLayoutProps>) {
           {/* Di động: sidebar nhường chỗ cho hàng tab cuộn ngang. */}
           <nav
             aria-label="Quản trị"
-            className="no-scrollbar flex gap-1.5 overflow-x-auto border-t border-line px-4 py-2 lg:hidden"
+            className="no-scrollbar mx-auto flex max-w-[1280px] gap-1.5 overflow-x-auto border-t border-line px-4 py-2 lg:hidden"
           >
             {LINKS.map((link) => (
               <NavLink
@@ -178,7 +179,11 @@ export function AdminLayout({ className = '' }: Readonly<AdminLayoutProps>) {
           </nav>
         </header>
 
-        <main className="min-w-0 flex-1 p-4 sm:p-6">
+        <main
+          className={`mx-auto w-full max-w-[1280px] flex-1 p-4 sm:p-6 ${
+            location.pathname === '/admin/ho-tro' ? 'overflow-hidden flex flex-col' : 'overflow-y-auto'
+          }`}
+        >
           <Outlet />
         </main>
       </div>

@@ -52,7 +52,7 @@ export function RegisterPage({}: Readonly<RegisterPageProps>) {
     <AuthShell
       title="Tạo tài khoản"
       subtitle="Đăng ký để lưu giỏ hàng, quản lý địa chỉ giao và theo dõi đơn."
-      imageSeed="chuan-dang-ky"
+      imageSeed="tamdang-dang-ky"
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         {message ? <Alert>{message}</Alert> : null}

@@ -3,6 +3,7 @@ import { prisma } from './lib/prisma.js';
 import { addressRouter } from './modules/addresses/address.routes.js';
 import { adminRouter } from './modules/admin/admin.routes.js';
 import { authRouter } from './modules/auth/auth.routes.js';
+import { adminBannerRouter, bannerRouter } from './modules/banners/banner.routes.js';
 import { cartRouter } from './modules/cart/cart.routes.js';
 import { chatRouter } from './modules/chat/chat.routes.js';
 import { adminChatRouter } from './modules/chat/admin-chat.routes.js';
@@ -38,6 +39,7 @@ apiRouter.get('/health', async (_req, res) => {
 
 // ------------------------------------------------------------------ công khai
 apiRouter.use('/auth', authRouter);
+apiRouter.use('/banners', bannerRouter);
 apiRouter.use('/categories', categoryRouter);
 apiRouter.use('/products', productRouter);
 
@@ -51,6 +53,7 @@ apiRouter.use('/chat', chatRouter);
 // Đặt TRƯỚC các router con: /admin/stats và /admin/inventory là route riêng,
 // không được để router nào khác nuốt mất.
 apiRouter.use('/admin', adminRouter);
+apiRouter.use('/admin/banners', adminBannerRouter);
 apiRouter.use('/admin/chat', adminChatRouter);
 apiRouter.use('/admin/categories', adminCategoryRouter);
 apiRouter.use('/admin/products', adminProductRouter);

@@ -189,55 +189,59 @@ export function AdminOrdersPage({}: Readonly<AdminOrdersPageProps>) {
         />
       ) : (
         <>
-          <div className="overflow-x-auto rounded-card border border-line bg-surface">
-            <table className="w-full min-w-[52rem] text-sm">
-              <thead className="border-b border-line bg-sunken text-left text-xs text-ink-muted">
+          <div className="overflow-x-auto rounded-card border border-line bg-surface shadow-xs">
+            <table className="w-full min-w-[54rem] text-sm">
+              <thead className="border-b border-line bg-sunken/60 text-left text-xs text-ink-muted">
                 <tr>
-                  <th className="px-3 py-2.5 font-medium">Mã đơn</th>
-                  <th className="px-3 py-2.5 font-medium">Khách hàng</th>
-                  <th className="px-3 py-2.5 font-medium">Ngày đặt</th>
-                  <th className="px-3 py-2.5 text-right font-medium">Tổng tiền</th>
-                  <th className="px-3 py-2.5 font-medium">Thanh toán</th>
-                  <th className="px-3 py-2.5 font-medium">Trạng thái</th>
-                  <th className="px-3 py-2.5" />
+                  <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[0.6875rem]">Mã đơn</th>
+                  <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[0.6875rem]">Khách hàng</th>
+                  <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[0.6875rem]">Ngày đặt</th>
+                  <th className="px-4 py-3 text-right font-semibold uppercase tracking-wider text-[0.6875rem]">Tổng tiền</th>
+                  <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[0.6875rem]">Thanh toán</th>
+                  <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[0.6875rem]">Trạng thái</th>
+                  <th className="px-4 py-3 text-right font-semibold uppercase tracking-wider text-[0.6875rem]">Thao tác</th>
                 </tr>
               </thead>
 
               <tbody className="divide-y divide-line">
                 {orders.data.items.map((order) => (
-                  <tr key={order.id}>
-                    <td className="px-3 py-2.5 font-mono text-xs font-medium">{order.code}</td>
-                    <td className="px-3 py-2.5">
+                  <tr key={order.id} className="hover:bg-sunken/40 transition-colors">
+                    <td className="px-4 py-3.5 font-mono text-xs font-bold text-accent">
+                      <Link to={`/admin/don-hang/${order.code}`} className="hover:underline">
+                        {order.code}
+                      </Link>
+                    </td>
+                    <td className="px-4 py-3.5">
                       <Link
                         to={`/admin/khach-hang/${order.user.id}`}
-                        className="block hover:text-accent"
+                        className="font-medium text-ink hover:text-accent transition block"
                       >
                         {order.user.fullName}
                       </Link>
-                      <span className="block text-xs text-ink-muted">{order.user.email}</span>
+                      <span className="block text-xs text-ink-muted truncate max-w-xs">{order.user.email}</span>
                     </td>
-                    <td className="px-3 py-2.5 text-xs whitespace-nowrap text-ink-muted">
+                    <td className="px-4 py-3.5 text-xs whitespace-nowrap text-ink-muted">
                       {formatDateTime(order.createdAt)}
                     </td>
-                    <td className="tabular px-3 py-2.5 text-right font-medium">
+                    <td className="tabular px-4 py-3.5 text-right font-bold text-ink">
                       {formatVnd(order.total)}
                     </td>
-                    <td className="px-3 py-2.5">
+                    <td className="px-4 py-3.5 whitespace-nowrap">
                       <span
-                        className={`inline-block rounded-control px-2 py-0.5 text-xs font-medium whitespace-nowrap ${PAYMENT_CLASS[order.paymentStatus] ?? ''}`}
+                        className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${PAYMENT_CLASS[order.paymentStatus] ?? 'bg-sunken text-ink-muted'}`}
                       >
                         {PAYMENT_LABEL[order.paymentStatus] ?? order.paymentStatus}
                       </span>
                     </td>
-                    <td className="px-3 py-2.5">
+                    <td className="px-4 py-3.5 whitespace-nowrap">
                       <OrderStatusBadge status={order.status} />
                     </td>
-                    <td className="px-3 py-2.5 text-right">
+                    <td className="px-4 py-3.5 text-right whitespace-nowrap">
                       <Link
                         to={`/admin/don-hang/${order.code}`}
-                        className="rounded-control px-2 py-1 text-xs font-medium text-accent hover:bg-accent-soft"
+                        className="inline-flex items-center gap-1 rounded-control border border-line bg-surface px-2.5 py-1 text-xs font-medium text-ink transition hover:border-accent hover:text-accent shadow-2xs"
                       >
-                        Chi tiết
+                        Xem chi tiết
                       </Link>
                     </td>
                   </tr>

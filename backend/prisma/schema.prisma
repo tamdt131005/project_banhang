@@ -74,6 +74,10 @@ enum InventoryMovementType {
   VARIANT_RETIRED
 }
 
+enum BannerPlacement {
+  HOME_HERO
+}
+
 // ---------------------------------------------------------------- người dùng
 
 model User {
@@ -159,6 +163,24 @@ model Category {
 
   @@index([parentId])
   @@map("categories")
+}
+
+// ---------------------------------------------------------- banner quảng cáo
+
+model Banner {
+  id        Int             @id @default(autoincrement())
+  name      String          @db.VarChar(120)
+  imageUrl  String          @db.VarChar(500)
+  altText   String          @db.VarChar(255)
+  linkUrl   String?         @db.VarChar(500)
+  placement BannerPlacement @default(HOME_HERO)
+  sortOrder Int             @default(0)
+  isActive  Boolean         @default(true)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  @@index([placement, isActive, sortOrder, id])
+  @@map("banners")
 }
 
 // ------------------------------------------------------------------ sản phẩm
@@ -391,6 +413,8 @@ model Conversation {
   userId          Int
   assignedAdminId Int?
   status          ConversationStatus @default(AI)
+  activeAiRunId   String?            @db.VarChar(64)
+  activeAiRunStartedAt DateTime?
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
   closedAt        DateTime?
@@ -402,6 +426,7 @@ model Conversation {
   @@index([userId, createdAt, id])
   @@index([status, createdAt, id])
   @@index([assignedAdminId, status, updatedAt, id])
+  @@index([status, activeAiRunStartedAt])
   @@map("conversations")
 }
 

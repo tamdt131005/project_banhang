@@ -35,6 +35,13 @@ type JsonResponse<
 type ContractConversationResponse = JsonResponse<'/chat/conversations', 'post', 201>;
 type ContractConversationMessageResponse = JsonResponse<'/chat/conversations/{id}/messages', 'post', 201>;
 type ContractMessagePageResponse = JsonResponse<'/chat/conversations/{id}/messages', 'get', 200>;
+type ContractCustomerConversationsResponse = JsonResponse<'/chat/conversations', 'get', 200>;
+
+export type CustomerConversationItem = components['schemas']['CustomerConversationItem'];
+
+export interface CustomerConversationsResponse extends Omit<ContractCustomerConversationsResponse, 'items'> {
+  items: CustomerConversationItem[];
+}
 
 export interface ConversationResponse extends Omit<ContractConversationResponse, 'conversation'> {
   conversation: ChatConversation;
@@ -44,6 +51,7 @@ export interface ConversationMessageResponse
   extends Omit<ContractConversationMessageResponse, 'conversation' | 'message'> {
   conversation: ChatConversation;
   message: ChatMessage;
+  aiPending?: boolean;
 }
 
 export interface MessagePageResponse extends Omit<ContractMessagePageResponse, 'messages'> {
@@ -51,6 +59,9 @@ export interface MessagePageResponse extends Omit<ContractMessagePageResponse, '
 }
 
 export const chatGateway = {
+  list: (params?: { page?: number; limit?: number; status?: ConversationStatus }) =>
+    api.get<CustomerConversationsResponse>('/api/chat/conversations', params),
+
   create: () => api.post<ConversationResponse>('/api/chat/conversations'),
 
   messages: (conversationId: number, page = 1, limit = 100) =>
@@ -66,4 +77,7 @@ export const chatGateway = {
 
   requestAdmin: (conversationId: number) =>
     api.post<ConversationMessageResponse>(`/api/chat/conversations/${conversationId}/request-admin`),
+
+  close: (conversationId: number) =>
+    api.post<ConversationMessageResponse>(`/api/chat/conversations/${conversationId}/close`),
 };

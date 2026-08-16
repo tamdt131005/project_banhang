@@ -6,6 +6,7 @@ export interface ProductGridProps {
   products: ApiProductSummary[];
   loading?: boolean;
   skeletonCount?: number;
+  home?: boolean;
 }
 
 /**
@@ -18,6 +19,7 @@ export function ProductGrid({
   products,
   loading = false,
   skeletonCount = 12,
+  home = false,
 }: Readonly<ProductGridProps>) {
   if (loading) {
     return (
@@ -39,7 +41,7 @@ export function ProductGrid({
   return (
     <div className={GRID}>
       {products.map((product) => (
-        <ProductCard key={product.id} product={product} />
+        <ProductCard key={product.id} product={product} home={home} />
       ))}
     </div>
   );

@@ -1,9 +1,10 @@
-import { type FormEvent, type MouseEvent, useState } from 'react';
+import { type FormEvent, type KeyboardEvent, type MouseEvent, useEffect, useRef, useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useCartCount } from '../../hooks/useCart';
 import { useCategoryLinks } from '../../hooks/useCategoryLinks';
-import { BagIcon, ChevronDownIcon, SearchIcon } from '../ui/icons';
+import { BrandLogo } from '../brand/BrandLogo';
+import { BagIcon, ChevronDownIcon, SearchIcon, XIcon } from '../ui/icons';
 import { ThemeToggle } from './ThemeToggle';
 import { UserMenu } from './UserMenu';
 
@@ -26,11 +27,26 @@ export function Header({ className = '' }: Readonly<HeaderProps>) {
   const cartCount = useCartCount();
   const { linkFor, childrenFor } = useCategoryLinks();
   const [keyword, setKeyword] = useState('');
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const mobileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isSearchOpen) {
+      mobileInputRef.current?.focus();
+    }
+  }, [isSearchOpen]);
 
   function submitSearch(event: FormEvent) {
     event.preventDefault();
     const trimmed = keyword.trim();
+    setIsSearchOpen(false);
     void navigate(trimmed ? `/san-pham?search=${encodeURIComponent(trimmed)}` : '/san-pham');
+  }
+
+  function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.key === 'Escape') {
+      setIsSearchOpen(false);
+    }
   }
 
   // Nav chữ hoa giãn chữ theo hướng premium — toàn bộ là link thật.
@@ -54,13 +70,13 @@ export function Header({ className = '' }: Readonly<HeaderProps>) {
        */
       className={`sticky top-0 z-20 border-b border-line bg-surface ${className}`}
     >
-      <div className="mx-auto flex h-16 max-w-[1280px] flex-wrap items-center gap-x-5 gap-y-0 px-4">
+      <div className="relative mx-auto flex h-16 max-w-[1280px] items-center gap-x-5 px-4">
         {/*
           Logo luôn là Link về trang chủ. Đây là lối thoát duy nhất trên máy
           tính vì thanh điều hướng đáy chỉ hiện ở di động.
         */}
-        <Link to="/" className="text-xl font-bold tracking-[-0.03em] uppercase">
-          Chuẩn<span className="text-accent">.</span>
+        <Link to="/" aria-label="Tâm Đặng — trang chủ">
+          <BrandLogo markSize={34} wordmarkClassName="hidden text-xl sm:inline" />
         </Link>
 
         <nav aria-label="Danh mục chính" className="hidden items-stretch gap-5 self-stretch lg:flex">
@@ -126,6 +142,17 @@ export function Header({ className = '' }: Readonly<HeaderProps>) {
         </nav>
 
         <div className="ml-auto flex items-center gap-1.5 text-sm">
+          {/* Nút kính lúp hiển thị khi thu gọn màn hình (< sm) */}
+          <button
+            type="button"
+            aria-label="Mở tìm kiếm"
+            onClick={() => setIsSearchOpen(true)}
+            className="grid size-9 place-items-center rounded-full transition-colors duration-[160ms] hover:bg-sunken sm:hidden"
+          >
+            <SearchIcon />
+          </button>
+
+          {/* Ô tìm kiếm cố định trên màn hình lớn (>= sm) */}
           <form onSubmit={submitSearch} className="relative hidden sm:block">
             <label htmlFor="header-search" className="sr-only">
               Tìm sản phẩm
@@ -137,7 +164,7 @@ export function Header({ className = '' }: Readonly<HeaderProps>) {
               value={keyword}
               onChange={(event) => setKeyword(event.target.value)}
               placeholder="Tìm áo, quần…"
-              className="h-9 w-44 rounded-control border border-line bg-sunken pr-4 pl-9 text-sm outline-none transition-colors duration-[160ms] placeholder:text-ink-muted focus:border-accent"
+              className="h-9 w-44 rounded-control border border-line bg-sunken pr-4 pl-9 text-sm outline-none transition-[width,border-color] duration-[160ms] placeholder:text-ink-muted focus:w-60 focus:border-accent"
             />
           </form>
 
@@ -174,21 +201,39 @@ export function Header({ className = '' }: Readonly<HeaderProps>) {
           <ThemeToggle />
         </div>
 
-        {/* Tìm kiếm trên di động: rơi xuống hàng riêng, chiếm trọn bề ngang. */}
-        <form onSubmit={submitSearch} className="relative w-full pb-3 sm:hidden">
-          <label htmlFor="header-search-mobile" className="sr-only">
-            Tìm sản phẩm
-          </label>
-          <SearchIcon className="pointer-events-none absolute top-[calc(50%-0.375rem)] left-3 size-4 -translate-y-1/2 text-ink-muted" />
-          <input
-            id="header-search-mobile"
-            type="search"
-            value={keyword}
-            onChange={(event) => setKeyword(event.target.value)}
-            placeholder="Tìm áo, quần, phụ kiện…"
-            className="h-9 w-full rounded-control border border-line bg-sunken pr-4 pl-9 text-sm outline-none transition-colors duration-[160ms] placeholder:text-ink-muted focus:border-accent"
-          />
-        </form>
+        {/* Khung tìm kiếm mở rộng nới rộng tràn header khi người dùng bấm kính lúp trên màn hình nhỏ */}
+        {isSearchOpen ? (
+          <div
+            className="absolute inset-0 z-30 flex items-center bg-surface px-4 sm:hidden"
+            onKeyDown={handleKeyDown}
+          >
+            <form onSubmit={submitSearch} className="relative flex w-full items-center gap-2">
+              <div className="relative flex-1">
+                <label htmlFor="header-search-expanded" className="sr-only">
+                  Tìm sản phẩm
+                </label>
+                <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-muted" />
+                <input
+                  ref={mobileInputRef}
+                  id="header-search-expanded"
+                  type="search"
+                  value={keyword}
+                  onChange={(event) => setKeyword(event.target.value)}
+                  placeholder="Tìm áo, quần, phụ kiện…"
+                  className="h-10 w-full rounded-control border border-line bg-sunken pr-4 pl-9 text-sm outline-none transition-colors duration-[160ms] placeholder:text-ink-muted focus:border-accent"
+                />
+              </div>
+              <button
+                type="button"
+                aria-label="Đóng tìm kiếm"
+                onClick={() => setIsSearchOpen(false)}
+                className="grid size-9 shrink-0 place-items-center rounded-full text-ink-muted transition-colors duration-[160ms] hover:bg-sunken hover:text-ink"
+              >
+                <XIcon className="size-5" />
+              </button>
+            </form>
+          </div>
+        ) : null}
       </div>
     </header>
   );

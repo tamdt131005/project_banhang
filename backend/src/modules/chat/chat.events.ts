@@ -1,12 +1,13 @@
 import { EventEmitter } from 'node:events';
-import type { ChatMessage, Conversation } from '@prisma/client';
+import type { ChatMessage } from '@prisma/client';
+import type { PublicConversation } from './chat.dto.js';
 
 export interface ChatCommittedEvents {
-  'conversation.created': { conversation: Conversation };
+  'conversation.created': { conversation: PublicConversation };
   'message.created': { message: ChatMessage };
-  'support.requested': { conversation: Conversation; message: ChatMessage };
-  'support.accepted': { conversation: Conversation; message: ChatMessage };
-  'conversation.closed': { conversation: Conversation; message: ChatMessage };
+  'support.requested': { conversation: PublicConversation; message: ChatMessage };
+  'support.accepted': { conversation: PublicConversation; message: ChatMessage };
+  'conversation.closed': { conversation: PublicConversation; message: ChatMessage };
 }
 
 class ChatEventBus extends EventEmitter {

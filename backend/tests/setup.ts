@@ -36,6 +36,7 @@ if (databaseName !== EXPECTED_TEST_DATABASE) {
 
 beforeEach(async () => {
   // Xoá theo thứ tự phụ thuộc khoá ngoại: con trước, cha sau.
+  await prisma.banner.deleteMany();
   await prisma.chatMessage.deleteMany();
   await prisma.conversation.deleteMany();
   await prisma.inventoryMovement.deleteMany();

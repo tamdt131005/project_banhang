@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { catalogApi } from '../../api/catalog';
+import { HomeBannerCarousel } from '../../components/banner/HomeBannerCarousel';
 import { ProductGrid } from '../../components/product/ProductGrid';
 import { Alert } from '../../components/ui/Feedback';
 import {
@@ -23,6 +24,11 @@ export function HomePage({}: Readonly<HomePageProps>) {
   const categories = useQuery({
     queryKey: ['categories'],
     queryFn: () => catalogApi.categories().then((response) => response.categories),
+  });
+
+  const banners = useQuery({
+    queryKey: ['banners', 'HOME_HERO'],
+    queryFn: () => catalogApi.banners().then((response) => response.banners),
   });
 
   const newest = useQuery({
@@ -76,48 +82,14 @@ export function HomePage({}: Readonly<HomePageProps>) {
 
   // Cổng vào theo đối tượng (chuẩn Canifa/H&M) — ảnh lớn tạo mảng thị giác.
   const gateways = [
-    { label: 'Đồ nam', to: linkFor('do-nam'), seed: 'chuan-cong-nam' },
-    { label: 'Đồ nữ', to: linkFor('do-nu'), seed: 'chuan-cong-nu' },
-    { label: 'Phụ kiện', to: linkFor('phu-kien'), seed: 'chuan-cong-phu-kien' },
+    { label: 'Đồ nam', to: linkFor('do-nam'), seed: 'tamdang-cong-nam' },
+    { label: 'Đồ nữ', to: linkFor('do-nu'), seed: 'tamdang-cong-nu' },
+    { label: 'Phụ kiện', to: linkFor('phu-kien'), seed: 'tamdang-cong-phu-kien' },
   ];
 
   return (
     <div className="space-y-10">
-      {/*
-        Lookbook hero khổ lớn (chuẩn Routine/YODY/IVY moda): một mảng ảnh làm
-        điểm dừng thị giác, chữ nằm trong dải gradient dành riêng bên trái —
-        ngoại lệ có kiểm soát của luật "không chồng lấn" (DESIGN.md v2.2).
-      */}
-      <section className="relative overflow-hidden rounded-card bg-sunken">
-        <img
-          src="https://picsum.photos/seed/chuan-lookbook/1600/700"
-          alt=""
-          /* Nằm đầu trang nên tải ngay, không lazy. 1600px là đủ cho khung
-             1280px — bản 1920 khiến picsum render chậm rõ rệt. */
-          decoding="async"
-          className="h-[340px] w-full object-cover md:h-[420px]"
-        />
-        <div className="absolute inset-0 flex flex-col justify-center bg-gradient-to-r from-black/60 via-black/25 to-transparent p-6 md:p-12">
-          <p className="label-block text-white/70">
-            Chuẩn<span className="text-accent">.</span> — tiệm quần áo
-          </p>
-          <h1 className="mt-3 max-w-[14ch] font-serif text-[clamp(2rem,5vw,3.25rem)] leading-[1.08] font-bold text-white">
-            Đồ cơ bản, đúng dáng
-          </h1>
-          <p className="mt-3 max-w-[38ch] text-sm text-white/85 md:text-base">
-            Áo thun, sơ mi, quần jeans và phụ kiện cho cả nam nữ. Ghi rõ chất liệu và bảng size
-            từng món.
-          </p>
-          <div className="mt-6">
-            <Link
-              to="/san-pham"
-              className="inline-flex h-11 items-center rounded-control bg-accent px-6 text-sm font-semibold text-accent-ink transition-transform duration-[160ms] ease-snap active:translate-y-px"
-            >
-              Mua ngay
-            </Link>
-          </div>
-        </div>
-      </section>
+      <HomeBannerCarousel banners={banners.data ?? []} />
 
       {/* Dải lối tắt kiểu sàn TMĐT — vòng tròn icon nhấc nhẹ khi trỏ chuột. */}
       <section aria-label="Lối tắt" className="rounded-card border border-line bg-surface px-4 py-5">
@@ -195,7 +167,7 @@ export function HomePage({}: Readonly<HomePageProps>) {
         {newest.isError ? (
           <Alert>{errorMessage(newest.error)}</Alert>
         ) : (
-          <ProductGrid products={newest.data?.items ?? []} loading={newest.isPending} skeletonCount={10} />
+          <ProductGrid products={newest.data?.items ?? []} loading={newest.isPending} skeletonCount={10} home />
         )}
       </section>
 
@@ -213,6 +185,7 @@ export function HomePage({}: Readonly<HomePageProps>) {
               products={suggestions.data?.items ?? []}
               loading={suggestions.isPending}
               skeletonCount={12}
+              home
             />
           )}
         </div>

@@ -1,5 +1,6 @@
 import { Link, Outlet } from 'react-router-dom';
 import { useCategoryLinks } from '../../hooks/useCategoryLinks';
+import { BrandLogo } from '../brand/BrandLogo';
 import { CustomerChatWidget } from '../chat/CustomerChatWidget';
 import { TruckIcon, WalletIcon } from '../ui/icons';
 import { Header } from './Header';
@@ -46,9 +47,7 @@ export function ShopLayout({ className = '' }: Readonly<ShopLayoutProps>) {
       <footer className="border-t border-line bg-surface">
         <div className="mx-auto grid max-w-[1280px] gap-8 px-4 py-10 md:grid-cols-[2fr_1fr_1fr]">
           <div>
-            <p className="text-lg font-bold tracking-[-0.03em] uppercase">
-              Chuẩn<span className="text-accent">.</span>
-            </p>
+            <BrandLogo markSize={36} />
             <p className="mt-3 max-w-xs text-sm text-ink-muted">
               Đồ cơ bản, đúng dáng — quần áo nam nữ và phụ kiện cho mỗi ngày, ghi rõ chất liệu và
               bảng size từng món.
@@ -86,7 +85,7 @@ export function ShopLayout({ className = '' }: Readonly<ShopLayoutProps>) {
 
         <div className="border-t border-line">
           <p className="mx-auto max-w-[1280px] px-4 py-4 text-center text-xs text-ink-muted">
-            © 2026 CHUẨN. — tiệm quần áo trực tuyến, dự án học tập
+            © 2026 TÂM ĐẶNG — tiệm quần áo trực tuyến, dự án học tập
           </p>
         </div>
       </footer>

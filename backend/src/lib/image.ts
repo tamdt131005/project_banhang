@@ -88,6 +88,28 @@ export async function storeAvatarImage(buffer: Buffer): Promise<string> {
   return `/uploads/${name}`;
 }
 
+/** Banner trang chủ: một bản WebP rộng, giữ trọn bố cục ảnh ở mọi tỉ lệ màn hình. */
+export async function storeBannerImage(buffer: Buffer): Promise<string> {
+  const dir = uploadDir();
+  await fs.mkdir(dir, { recursive: true });
+
+  const name = `banner-${Date.now().toString(36)}-${crypto.randomBytes(6).toString('hex')}.webp`;
+  const target = path.join(dir, name);
+
+  try {
+    await sharp(buffer)
+      .rotate()
+      .resize(1600, 900, { fit: 'inside', withoutEnlargement: true })
+      .webp({ quality: 82 })
+      .toFile(target);
+  } catch {
+    await fs.rm(target, { force: true }).catch(() => undefined);
+    throw AppError.badRequest('INVALID_IMAGE', 'Tệp tải lên không phải ảnh hợp lệ.');
+  }
+
+  return `/uploads/${name}`;
+}
+
 /** Xoá một tệp đã upload theo URL /uploads/... — URL ngoài hệ thống thì bỏ qua. */
 export async function deleteUploadedFile(url: string | null): Promise<void> {
   if (!url || !url.startsWith('/uploads/')) return;

@@ -1,4 +1,4 @@
-# CHUẨN. — tiệm quần áo trực tuyến
+# TÂM ĐẶNG — tiệm quần áo trực tuyến
 
 Shop bán quần áo chạy trên máy: khách xem đồ nam/nữ và phụ kiện, đăng ký/đăng nhập, bỏ giỏ, đặt hàng COD; admin quản lý sản phẩm, danh mục và đơn hàng. Hệ thống thiết kế (bảng màu, thẻ ảnh dọc 4:5, quy tắc chống lag) nằm trong `DESIGN.md`.
 
