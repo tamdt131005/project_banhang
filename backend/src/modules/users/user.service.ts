@@ -1,7 +1,8 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma.js';
 import { AppError } from '../../middleware/error.js';
-import type { RoleUpdateInput, UserListQuery } from './user.schema.js';
+import type { StaffAccessInput, RoleUpdateInput, UserListQuery } from './user.schema.js';
+import { getStaffAccess as readStaffAccess } from '../permissions/permission.service.js';
 
 /** Không bao giờ chọn passwordHash — nó không được rời khỏi tầng dữ liệu. */
 const listSelect = {
@@ -134,22 +135,74 @@ export async function updateUserRole(
     }
   }
 
-  const user = await prisma.user.update({
-    where: { id: targetId },
-    data: { role: input.role },
-    select: listSelect,
-  });
-
-  // Hạ quyền mà phiên cũ vẫn sống thì access token còn hạn vẫn mang role ADMIN.
-  // Thu hồi refresh token để tối đa 15 phút nữa là mất sạch quyền.
-  if (input.role === 'USER') {
-    await prisma.refreshToken.updateMany({
+  return prisma.$transaction(async (tx) => {
+    const user = await tx.user.update({
+      where: { id: targetId },
+      data: { role: input.role },
+      select: listSelect,
+    });
+    await tx.userStaffPermission.deleteMany({ where: { userId: targetId } });
+    await tx.refreshToken.updateMany({
       where: { userId: targetId, revokedAt: null },
       data: { revokedAt: new Date() },
     });
+    return user;
+  });
+}
+
+export async function getStaffAccess(userId: number) {
+  const access = await readStaffAccess(userId);
+  if (!access) throw AppError.notFound('Không tìm thấy tài khoản này.');
+  if (access.role === 'ADMIN') {
+    throw AppError.conflict('ADMIN_ACCESS_LOCKED', 'Không thể chỉnh quyền của quản trị viên cấp cao.');
+  }
+  return access;
+}
+
+export async function updateStaffAccess(
+  actorId: number,
+  targetId: number,
+  input: StaffAccessInput,
+) {
+  const target = await prisma.user.findUnique({
+    where: { id: targetId },
+    select: { id: true, role: true },
+  });
+  if (!target) throw AppError.notFound('Không tìm thấy tài khoản này.');
+  if (target.role === 'ADMIN') {
+    throw AppError.conflict('ADMIN_ACCESS_LOCKED', 'Không thể chỉnh quyền của quản trị viên cấp cao.');
+  }
+  if (targetId === actorId) {
+    throw AppError.badRequest('CANNOT_EDIT_SELF', 'Không thể tự chỉnh quyền của chính mình.');
   }
 
-  return user;
+  const result = await prisma.$transaction(async (tx) => {
+    await tx.user.update({ where: { id: targetId }, data: { role: input.role } });
+    await tx.userStaffPermission.deleteMany({ where: { userId: targetId } });
+    if (input.role === 'STAFF') {
+      await tx.userStaffPermission.createMany({
+        data: input.permissions.map((permission) => ({
+          userId: targetId,
+          permission,
+          grantedById: actorId,
+        })),
+      });
+    }
+    await tx.refreshToken.updateMany({
+      where: { userId: targetId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+    return tx.user.findUniqueOrThrow({
+      where: { id: targetId },
+      select: { id: true, role: true, staffPermissions: { select: { permission: true } } },
+    });
+  });
+
+  return {
+    id: result.id,
+    role: result.role,
+    permissions: result.staffPermissions.map((item) => item.permission),
+  };
 }
 
 /** Buộc đăng xuất mọi thiết bị của một tài khoản (nghi bị lộ mật khẩu). */

@@ -2,12 +2,13 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { type ReactNode, createContext, useContext, useMemo } from 'react';
 import { type LoginInput, type RegisterInput, type UpdateProfileInput, authApi } from '../api/auth';
 import { ApiError } from '../api/client';
-import type { ApiUser } from '../types/api';
+import type { AdminPermission, ApiUser } from '../types/api';
 
 interface AuthContextValue {
   user: ApiUser | null;
   isLoading: boolean;
   isAdmin: boolean;
+  can: (permission: AdminPermission) => boolean;
   login: (input: LoginInput) => Promise<ApiUser>;
   register: (input: RegisterInput) => Promise<ApiUser>;
   updateProfile: (input: UpdateProfileInput) => Promise<ApiUser>;
@@ -37,7 +38,7 @@ export function AuthProvider({ children }: Readonly<AuthProviderProps>) {
         throw error;
       }
     },
-    staleTime: Infinity,
+    staleTime: 30_000,
   });
 
   const loginMutation = useMutation({
@@ -96,6 +97,9 @@ export function AuthProvider({ children }: Readonly<AuthProviderProps>) {
       user: meQuery.data ?? null,
       isLoading: meQuery.isPending,
       isAdmin: meQuery.data?.role === 'ADMIN',
+      can: (permission) =>
+        meQuery.data?.role === 'ADMIN' ||
+        (meQuery.data?.role === 'STAFF' && meQuery.data.adminPermissions.includes(permission)),
       login: async (input) => (await loginMutation.mutateAsync(input)).user,
       register: async (input) => (await registerMutation.mutateAsync(input)).user,
       updateProfile: async (input) => (await updateProfileMutation.mutateAsync(input)).user,

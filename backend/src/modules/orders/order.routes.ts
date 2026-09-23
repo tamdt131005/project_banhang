@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { requireAdmin, requireAuth } from '../../middleware/auth.js';
+import { requireAuth, requirePermission } from '../../middleware/auth.js';
 import { orderLimiter } from '../../middleware/rateLimit.js';
 import {
   adminDetailHandler,
@@ -23,7 +23,7 @@ orderRouter.post('/:code/cancel', cancelHandler);
 
 /** /api/admin/orders */
 export const adminOrderRouter = Router();
-adminOrderRouter.use(requireAuth, requireAdmin);
+adminOrderRouter.use(requireAuth, requirePermission('ORDERS'));
 adminOrderRouter.get('/', adminListHandler);
 adminOrderRouter.get('/:code', adminDetailHandler);
 adminOrderRouter.patch('/:id/status', adminUpdateStatusHandler);

@@ -10,12 +10,14 @@ import {
   MessageIcon,
   ReceiptIcon,
   StoreIcon,
+  ShieldIcon,
   TagIcon,
   UsersIcon,
   WarehouseIcon,
 } from '../ui/icons';
 import { ThemeToggle } from './ThemeToggle';
 import { UserMenu } from './UserMenu';
+import type { AdminPermission } from '../../types/api';
 
 export interface AdminLayoutProps {
   className?: string;
@@ -25,27 +27,40 @@ export interface AdminLayoutProps {
  * Chia nhóm theo công việc chứ không đổ một danh sách phẳng: bán hàng (đơn)
  * tách khỏi hàng hoá (sản phẩm/kho/danh mục) để mắt tìm đúng chỗ.
  */
-const GROUPS = [
+type AdminNavLink = {
+  to: string;
+  label: string;
+  icon: React.ReactNode;
+  end: boolean;
+  permission?: AdminPermission;
+  ownerOnly?: boolean;
+};
+
+const GROUPS: { title: string | null; links: AdminNavLink[] }[] = [
   {
     title: null,
-    links: [{ to: '/admin', label: 'Tổng quan', icon: <GaugeIcon />, end: true }],
+    links: [{ to: '/admin', label: 'Tổng quan', icon: <GaugeIcon />, end: true, permission: 'DASHBOARD' as AdminPermission }],
   },
   {
     title: 'Bán hàng',
     links: [
-      { to: '/admin/don-hang', label: 'Đơn hàng', icon: <ReceiptIcon />, end: false },
-      { to: '/admin/ho-tro', label: 'Hỗ trợ', icon: <MessageIcon />, end: false },
-      { to: '/admin/khach-hang', label: 'Khách hàng', icon: <UsersIcon />, end: false },
+      { to: '/admin/don-hang', label: 'Đơn hàng', icon: <ReceiptIcon />, end: false, permission: 'ORDERS' as AdminPermission },
+      { to: '/admin/ho-tro', label: 'Hỗ trợ', icon: <MessageIcon />, end: false, permission: 'SUPPORT' as AdminPermission },
+      { to: '/admin/khach-hang', label: 'Khách hàng', icon: <UsersIcon />, end: false, permission: 'CUSTOMERS' as AdminPermission },
     ],
   },
   {
     title: 'Hàng hoá',
     links: [
-      { to: '/admin/san-pham', label: 'Sản phẩm', icon: <BoxIcon />, end: false },
-      { to: '/admin/kho', label: 'Kho hàng', icon: <WarehouseIcon />, end: false },
-      { to: '/admin/danh-muc', label: 'Danh mục', icon: <TagIcon />, end: false },
-      { to: '/admin/banner', label: 'Banner', icon: <CameraIcon />, end: false },
+      { to: '/admin/san-pham', label: 'Sản phẩm', icon: <BoxIcon />, end: false, permission: 'CATALOG' as AdminPermission },
+      { to: '/admin/kho', label: 'Kho hàng', icon: <WarehouseIcon />, end: false, permission: 'INVENTORY' as AdminPermission },
+      { to: '/admin/danh-muc', label: 'Danh mục', icon: <TagIcon />, end: false, permission: 'CATALOG' as AdminPermission },
+      { to: '/admin/banner', label: 'Banner', icon: <CameraIcon />, end: false, permission: 'BANNERS' as AdminPermission },
     ],
+  },
+  {
+    title: 'Quản trị',
+    links: [{ to: '/admin/phan-quyen', label: 'Phân quyền', icon: <ShieldIcon />, end: false, ownerOnly: true }],
   },
 ];
 
@@ -57,7 +72,7 @@ const LINKS = GROUPS.flatMap((group) => group.links);
  * và tách hẳn hai không gian giúp biết ngay mình đang đứng ở đâu.
  */
 export function AdminLayout({ className = '' }: Readonly<AdminLayoutProps>) {
-  const { user } = useAuth();
+  const { user, can, isAdmin } = useAuth();
   const location = useLocation();
 
   // Nhánh đang mở — cho breadcrumb ở top bar. Duyệt từ đường dẫn dài nhất để
@@ -70,6 +85,14 @@ export function AdminLayout({ className = '' }: Readonly<AdminLayoutProps>) {
 
   // AdminRoute đã chặn người lạ; kiểm tra lại chỉ để TypeScript yên tâm.
   if (!user) return null;
+
+  const visibleGroups = GROUPS.map((group) => ({
+    ...group,
+    links: group.links.filter((link) =>
+      link.ownerOnly ? isAdmin : link.permission ? can(link.permission) : true,
+    ),
+  })).filter((group) => group.links.length > 0);
+  const visibleLinks = visibleGroups.flatMap((group) => group.links);
 
   const navItemClass = ({ isActive }: { isActive: boolean }) =>
     `flex items-center gap-2.5 rounded-control px-3 py-2.5 text-sm transition-colors duration-[160ms] ${
@@ -90,7 +113,7 @@ export function AdminLayout({ className = '' }: Readonly<AdminLayoutProps>) {
         </Link>
 
         <nav aria-label="Quản trị" className="flex-1 space-y-4 overflow-y-auto p-3">
-          {GROUPS.map((group) => (
+          {visibleGroups.map((group) => (
             <div key={group.title ?? 'chinh'}>
               {group.title ? (
                 <p className="px-3 pb-1.5 text-[0.6875rem] font-semibold tracking-wider text-ink-muted uppercase">
@@ -114,7 +137,7 @@ export function AdminLayout({ className = '' }: Readonly<AdminLayoutProps>) {
             <Avatar name={user.fullName} src={user.avatarUrl} size="sm" />
             <div className="min-w-0">
               <p className="truncate text-sm font-medium">{user.fullName}</p>
-              <p className="text-xs text-ink-muted">Quản trị viên</p>
+              <p className="text-xs text-ink-muted">{user.role === 'ADMIN' ? 'Quản trị viên' : 'Nhân viên'}</p>
             </div>
           </div>
           <Link
@@ -159,7 +182,7 @@ export function AdminLayout({ className = '' }: Readonly<AdminLayoutProps>) {
             aria-label="Quản trị"
             className="no-scrollbar mx-auto flex max-w-[1280px] gap-1.5 overflow-x-auto border-t border-line px-4 py-2 lg:hidden"
           >
-            {LINKS.map((link) => (
+            {visibleLinks.map((link) => (
               <NavLink
                 key={link.to}
                 to={link.to}

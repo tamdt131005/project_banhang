@@ -1,10 +1,11 @@
-import { Prisma, type Role, type User } from '@prisma/client';
+import { Prisma, type Role, type StaffPermission, type User } from '@prisma/client';
 import { deleteUploadedFile, storeAvatarImage } from '../../lib/image.js';
 import { createRefreshToken, hashRefreshToken, signAccessToken } from '../../lib/jwt.js';
 import { hashPassword, verifyPassword } from '../../lib/password.js';
 import { prisma } from '../../lib/prisma.js';
 import { AppError } from '../../middleware/error.js';
 import type { LoginInput, RegisterInput, UpdateProfileInput } from './auth.schema.js';
+import { listUserPermissions } from '../permissions/permission.service.js';
 
 export interface PublicUser {
   id: number;
@@ -13,10 +14,11 @@ export interface PublicUser {
   phone: string | null;
   avatarUrl: string | null;
   role: Role;
+  adminPermissions: StaffPermission[];
 }
 
 /** Không bao giờ trả passwordHash ra ngoài — mọi response về user đi qua đây. */
-export function toPublicUser(user: User): PublicUser {
+export async function toPublicUser(user: User): Promise<PublicUser> {
   return {
     id: user.id,
     email: user.email,
@@ -24,6 +26,7 @@ export function toPublicUser(user: User): PublicUser {
     phone: user.phone,
     avatarUrl: user.avatarUrl,
     role: user.role,
+    adminPermissions: user.role === 'STAFF' ? await listUserPermissions(user.id) : [],
   };
 }
 
@@ -69,7 +72,7 @@ export async function register(input: RegisterInput) {
     throw error;
   }
 
-  return { user: toPublicUser(user), tokens: await issueTokens(user) };
+  return { user: await toPublicUser(user), tokens: await issueTokens(user) };
 }
 
 export async function login(input: LoginInput) {
@@ -82,7 +85,7 @@ export async function login(input: LoginInput) {
     throw new AppError(401, 'INVALID_CREDENTIALS', 'Email hoặc mật khẩu không đúng.');
   }
 
-  return { user: toPublicUser(user), tokens: await issueTokens(user) };
+  return { user: await toPublicUser(user), tokens: await issueTokens(user) };
 }
 
 export async function refresh(rawToken: string) {
@@ -130,7 +133,7 @@ export async function refresh(rawToken: string) {
   ]);
 
   return {
-    user: toPublicUser(stored.user),
+    user: await toPublicUser(stored.user),
     tokens: { accessToken: signAccessToken(stored.user), refreshToken: next.token },
   };
 }

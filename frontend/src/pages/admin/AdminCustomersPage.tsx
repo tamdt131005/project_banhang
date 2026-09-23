@@ -44,7 +44,7 @@ export function AdminCustomersPage({}: Readonly<AdminCustomersPageProps>) {
     queryFn: () =>
       adminGateway.users.list({
         ...(search ? { search } : {}),
-        ...(role ? { role: role as 'USER' | 'ADMIN' } : {}),
+        ...(role ? { role: role as 'USER' | 'STAFF' | 'ADMIN' } : {}),
         sort,
         page,
         limit: 20,
@@ -93,6 +93,7 @@ export function AdminCustomersPage({}: Readonly<AdminCustomersPageProps>) {
           {[
             { value: '', label: 'Tất cả' },
             { value: 'USER', label: 'Khách' },
+            { value: 'STAFF', label: 'Nhân viên' },
             { value: 'ADMIN', label: 'Quản trị' },
           ].map((option) => (
             <button
@@ -159,10 +160,10 @@ export function AdminCustomersPage({}: Readonly<AdminCustomersPageProps>) {
                         <div className="min-w-0">
                           <p className="flex items-center gap-1.5 text-sm font-semibold text-ink">
                             <span className="line-clamp-1">{user.fullName}</span>
-                            {user.role === 'ADMIN' ? (
+                            {user.role !== 'USER' ? (
                               <span className="inline-flex shrink-0 items-center gap-1 rounded-control bg-accent-soft px-1.5 py-0.5 text-[0.625rem] font-bold text-accent">
                                 <ShieldIcon className="size-3" />
-                                Quản trị
+                                {user.role === 'ADMIN' ? 'Quản trị' : 'Nhân viên'}
                               </span>
                             ) : null}
                           </p>

@@ -2,6 +2,8 @@ import type { RequestHandler } from 'express';
 import { ACCESS_COOKIE } from '../lib/cookies.js';
 import { verifyAccessToken } from '../lib/jwt.js';
 import { AppError } from './error.js';
+import type { StaffPermissionKey } from '../modules/permissions/permission.constants.js';
+import * as permissionService from '../modules/permissions/permission.service.js';
 
 /**
  * Chặn request chưa đăng nhập và gắn `req.user`.
@@ -33,8 +35,28 @@ export const requireAdmin: RequestHandler = (req, _res, next) => {
   if (!req.user) {
     throw AppError.unauthorized();
   }
-  if (req.user.role !== 'ADMIN') {
-    throw AppError.forbidden('Chức năng này chỉ dành cho quản trị viên.');
-  }
-  next();
+  return permissionService.getUserRole(req.user.id).then((role) => {
+    if (!role) throw AppError.unauthorized();
+    req.user!.role = role;
+    if (role !== 'ADMIN') throw AppError.forbidden('Chức năng này chỉ dành cho quản trị viên.');
+    next();
+  });
 };
+
+/** ADMIN có toàn quyền; STAFF phải có đúng quyền đã cấp trong database. */
+export function requirePermission(permission: StaffPermissionKey): RequestHandler {
+  return async (req, _res, next) => {
+    if (!req.user) throw AppError.unauthorized();
+    const role = await permissionService.getUserRole(req.user.id);
+    if (!role) throw AppError.unauthorized();
+    req.user.role = role;
+    if (role === 'ADMIN') {
+      next();
+      return;
+    }
+    if (role !== 'STAFF' || !(await permissionService.userHasPermission(req.user.id, permission))) {
+      throw AppError.forbidden('Tài khoản chưa được cấp quyền sử dụng mục này.');
+    }
+    next();
+  };
+}

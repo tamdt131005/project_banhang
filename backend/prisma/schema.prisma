@@ -17,7 +17,18 @@ datasource db {
 
 enum Role {
   USER
+  STAFF
   ADMIN
+}
+
+enum StaffPermission {
+  DASHBOARD
+  ORDERS
+  INVENTORY
+  CATALOG
+  BANNERS
+  CUSTOMERS
+  SUPPORT
 }
 
 enum ConversationStatus {
@@ -102,6 +113,8 @@ model User {
   customerConversations Conversation[]    @relation("ConversationCustomer")
   assignedConversations Conversation[]    @relation("ConversationAdmin")
   chatMessages          ChatMessage[]      @relation("ChatMessageSender")
+  staffPermissions      UserStaffPermission[] @relation("StaffPermissionUser")
+  grantedStaffPermissions UserStaffPermission[] @relation("StaffPermissionGrantor")
 
   @@map("users")
 }
@@ -120,6 +133,22 @@ model RefreshToken {
 
   @@index([userId])
   @@map("refresh_tokens")
+}
+
+/// Explicit admin-section access granted to an individual staff account.
+model UserStaffPermission {
+  id          Int            @id @default(autoincrement())
+  userId      Int
+  permission  StaffPermission
+  grantedById Int
+  createdAt   DateTime       @default(now())
+
+  user      User @relation("StaffPermissionUser", fields: [userId], references: [id], onDelete: Cascade)
+  grantedBy User @relation("StaffPermissionGrantor", fields: [grantedById], references: [id], onDelete: Restrict)
+
+  @@unique([userId, permission])
+  @@index([grantedById])
+  @@map("user_staff_permissions")
 }
 
 model Address {

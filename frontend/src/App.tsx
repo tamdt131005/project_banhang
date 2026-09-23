@@ -15,6 +15,7 @@ import { AdminOrdersPage } from './pages/admin/AdminOrdersPage';
 import { AdminProductFormPage } from './pages/admin/AdminProductFormPage';
 import { AdminProductsPage } from './pages/admin/AdminProductsPage';
 import { AdminSupportPage } from './pages/admin/AdminSupportPage';
+import { AdminPermissionsPage } from './pages/admin/AdminPermissionsPage';
 import { LoginPage } from './pages/auth/LoginPage';
 import { RegisterPage } from './pages/auth/RegisterPage';
 import { AddressesPage } from './pages/shop/AddressesPage';
@@ -27,7 +28,7 @@ import { OrderSuccessPage } from './pages/shop/OrderSuccessPage';
 import { ProductDetailPage } from './pages/shop/ProductDetailPage';
 import { ProductsPage } from './pages/shop/ProductsPage';
 import { ProfilePage } from './pages/shop/ProfilePage';
-import { AdminRoute, ProtectedRoute } from './routes/Guards';
+import { AdminOwnerRoute, AdminPermissionRoute, AdminRoute, ProtectedRoute } from './routes/Guards';
 
 export interface AppProps {}
 
@@ -68,18 +69,35 @@ export default function App({}: Readonly<AppProps>) {
 
       <Route element={<AdminRoute />}>
         <Route path="admin" element={<AdminLayout />}>
-          <Route index element={<AdminDashboardPage />} />
-          <Route path="san-pham" element={<AdminProductsPage />} />
-          {/* "moi" rơi vào :id và được trang form hiểu là chế độ tạo mới. */}
-          <Route path="san-pham/:id" element={<AdminProductFormPage />} />
-          <Route path="kho" element={<AdminInventoryPage />} />
-          <Route path="danh-muc" element={<AdminCategoriesPage />} />
-          <Route path="banner" element={<AdminBannersPage />} />
-          <Route path="don-hang" element={<AdminOrdersPage />} />
-          <Route path="don-hang/:code" element={<AdminOrderDetailPage />} />
-          <Route path="ho-tro" element={<AdminSupportPage />} />
-          <Route path="khach-hang" element={<AdminCustomersPage />} />
-          <Route path="khach-hang/:id" element={<AdminCustomerDetailPage />} />
+          <Route element={<AdminPermissionRoute permission="DASHBOARD" />}>
+            <Route index element={<AdminDashboardPage />} />
+          </Route>
+          <Route element={<AdminPermissionRoute permission="CATALOG" />}>
+            <Route path="san-pham" element={<AdminProductsPage />} />
+            {/* "moi" rơi vào :id và được trang form hiểu là chế độ tạo mới. */}
+            <Route path="san-pham/:id" element={<AdminProductFormPage />} />
+            <Route path="danh-muc" element={<AdminCategoriesPage />} />
+          </Route>
+          <Route element={<AdminPermissionRoute permission="INVENTORY" />}>
+            <Route path="kho" element={<AdminInventoryPage />} />
+          </Route>
+          <Route element={<AdminPermissionRoute permission="BANNERS" />}>
+            <Route path="banner" element={<AdminBannersPage />} />
+          </Route>
+          <Route element={<AdminPermissionRoute permission="ORDERS" />}>
+            <Route path="don-hang" element={<AdminOrdersPage />} />
+            <Route path="don-hang/:code" element={<AdminOrderDetailPage />} />
+          </Route>
+          <Route element={<AdminPermissionRoute permission="SUPPORT" />}>
+            <Route path="ho-tro" element={<AdminSupportPage />} />
+          </Route>
+          <Route element={<AdminPermissionRoute permission="CUSTOMERS" />}>
+            <Route path="khach-hang" element={<AdminCustomersPage />} />
+            <Route path="khach-hang/:id" element={<AdminCustomerDetailPage />} />
+          </Route>
+          <Route element={<AdminOwnerRoute />}>
+            <Route path="phan-quyen" element={<AdminPermissionsPage />} />
+          </Route>
         </Route>
       </Route>
     </Routes>

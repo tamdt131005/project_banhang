@@ -14,7 +14,8 @@ components:
     OrderStatus: { type: string, enum: [PENDING, CONFIRMED, SHIPPING, DELIVERED, CANCELLED] }
     PaymentStatus: { type: string, enum: [UNPAID, PAID, FAILED] }
     PaymentMethod: { type: string, enum: [COD, MOMO] }
-    Role: { type: string, enum: [USER, ADMIN] }
+    Role: { type: string, enum: [USER, STAFF, ADMIN] }
+    StaffPermission: { type: string, enum: [DASHBOARD, ORDERS, INVENTORY, CATALOG, BANNERS, CUSTOMERS, SUPPORT] }
     ConversationStatus: { type: string, enum: [AI, WAITING_ADMIN, LIVE, CLOSED] }
     MessageSender: { type: string, enum: [USER, AI, ADMIN, SYSTEM] }
     ActorType: { type: string, enum: [CUSTOMER, ADMIN, SYSTEM] }
@@ -377,6 +378,13 @@ components:
               type: object
               required: [id, name]
               properties: { id: { type: integer }, name: { type: string } }
+    UserStaffAccess:
+      type: object
+      required: [id, role, permissions]
+      properties:
+        id: { type: integer }
+        role: { type: string, enum: [USER, STAFF] }
+        permissions: { type: array, items: { $ref: '#/components/schemas/StaffPermission' } }
     AdminUser:
       type: object
       required: [id, email, fullName, phone, avatarUrl, role, createdAt, _count]
@@ -746,11 +754,21 @@ paths:
       operationId: getAdminUser
       parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
       responses: { '200': { description: User detail, content: { application/json: { schema: { type: object, required: [user], properties: { user: { $ref: '#/components/schemas/AdminUserDetail' } } } } } } }
+  /admin/users/{id}/access:
+    get:
+      operationId: getAdminUserAccess
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses: { '200': { description: Staff access, content: { application/json: { schema: { type: object, required: [access], properties: { access: { $ref: '#/components/schemas/UserStaffAccess' } } } } } } }
+    patch:
+      operationId: updateAdminUserAccess
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [role, permissions], properties: { role: { type: string, enum: [USER, STAFF] }, permissions: { type: array, items: { $ref: '#/components/schemas/StaffPermission' } } } } } } }
+      responses: { '200': { description: Staff access updated, content: { application/json: { schema: { type: object, required: [access], properties: { access: { $ref: '#/components/schemas/UserStaffAccess' } } } } } } }
   /admin/users/{id}/role:
     patch:
       operationId: updateAdminUserRole
       parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
-      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [role], properties: { role: { $ref: '#/components/schemas/Role' } } } } } }
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [role], properties: { role: { type: string, enum: [USER, ADMIN] } } } } } }
       responses: { '200': { description: Role updated, content: { application/json: { schema: { type: object, required: [user], properties: { user: { $ref: '#/components/schemas/AdminUser' } } } } } } }
   /admin/users/{id}/revoke-sessions:
     post:

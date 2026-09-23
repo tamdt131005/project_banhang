@@ -27,7 +27,7 @@ export function AdminCustomerDetailPage({}: Readonly<AdminCustomerDetailPageProp
   const { id = '' } = useParams<{ id: string }>();
   const userId = Number(id);
   const queryClient = useQueryClient();
-  const { user: me } = useAuth();
+  const { user: me, isAdmin: canManageAccess } = useAuth();
 
   const [confirming, setConfirming] = useState<'role' | 'revoke' | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -88,6 +88,7 @@ export function AdminCustomerDetailPage({}: Readonly<AdminCustomerDetailPageProp
   const data = user.data;
   const isSelf = me?.id === data.id;
   const isAdmin = data.role === 'ADMIN';
+  const isStaff = data.role === 'STAFF';
 
   return (
     <div className="space-y-4">
@@ -113,11 +114,11 @@ export function AdminCustomerDetailPage({}: Readonly<AdminCustomerDetailPageProp
                 <p className="truncate text-sm text-ink-muted">{data.email}</p>
                 <span
                   className={`mt-1 inline-flex items-center gap-1 rounded-control px-2 py-0.5 text-[0.625rem] font-bold ${
-                    isAdmin ? 'bg-accent-soft text-accent' : 'bg-sunken text-ink-muted'
+                    data.role !== 'USER' ? 'bg-accent-soft text-accent' : 'bg-sunken text-ink-muted'
                   }`}
                 >
-                  {isAdmin ? <ShieldIcon className="size-3" /> : <UserIcon className="size-3" />}
-                  {isAdmin ? 'Quản trị viên' : 'Khách hàng'}
+                  {data.role !== 'USER' ? <ShieldIcon className="size-3" /> : <UserIcon className="size-3" />}
+                  {isAdmin ? 'Quản trị viên' : isStaff ? 'Nhân viên' : 'Khách hàng'}
                 </span>
               </div>
             </div>
@@ -153,24 +154,39 @@ export function AdminCustomerDetailPage({}: Readonly<AdminCustomerDetailPageProp
           <section className="space-y-2 rounded-card border border-line bg-surface p-4 sm:p-5">
             <h2 className="font-semibold">Quyền truy cập</h2>
             <p className="text-xs text-ink-muted">
-              Quản trị viên vào được toàn bộ khu quản trị: sản phẩm, kho, đơn hàng và tài khoản.
+              {isAdmin
+                ? 'Quản trị viên có toàn quyền trên khu quản trị.'
+                : isStaff
+                  ? 'Nhân viên chỉ truy cập các mục được cấp riêng.'
+                  : 'Tài khoản khách hàng chưa được cấp quyền quản trị.'}
             </p>
 
             <div className="flex flex-wrap gap-2 pt-1">
-              <Button
-                variant={isAdmin ? 'danger' : 'secondary'}
-                size="sm"
-                disabled={isSelf}
-                onClick={() => setConfirming('role')}
-              >
-                <ShieldIcon className="size-3.5" />
-                {isAdmin ? 'Hạ về quyền khách' : 'Cấp quyền quản trị'}
-              </Button>
-
-              <Button variant="secondary" size="sm" onClick={() => setConfirming('revoke')}>
-                <LogoutIcon className="size-3.5" />
-                Buộc đăng xuất
-              </Button>
+              {canManageAccess && !isAdmin ? (
+                <Link
+                  to={`/admin/phan-quyen?role=${isStaff ? 'STAFF' : 'USER'}&id=${data.id}`}
+                  className="inline-flex h-8 items-center gap-1.5 rounded-control border border-line bg-surface px-3 text-xs font-medium text-ink transition hover:border-accent hover:text-accent"
+                >
+                  <ShieldIcon className="size-3.5" />
+                  {isStaff ? 'Chỉnh quyền nhân viên' : 'Gắn quyền nhân viên'}
+                </Link>
+              ) : null}
+              {canManageAccess && !isSelf ? (
+                <Button
+                  variant={isAdmin ? 'danger' : 'secondary'}
+                  size="sm"
+                  onClick={() => setConfirming('role')}
+                >
+                  <ShieldIcon className="size-3.5" />
+                  {isAdmin ? 'Hạ về quyền khách' : 'Cấp quyền quản trị cấp cao'}
+                </Button>
+              ) : null}
+              {canManageAccess ? (
+                <Button variant="secondary" size="sm" onClick={() => setConfirming('revoke')}>
+                  <LogoutIcon className="size-3.5" />
+                  Buộc đăng xuất
+                </Button>
+              ) : null}
             </div>
 
             {isSelf ? (
@@ -255,7 +271,7 @@ export function AdminCustomerDetailPage({}: Readonly<AdminCustomerDetailPageProp
       <ConfirmDialog
         open={confirming === 'role'}
         danger={isAdmin}
-        title={isAdmin ? 'Hạ về quyền khách hàng?' : 'Cấp quyền quản trị?'}
+        title={isAdmin ? 'Hạ về quyền khách hàng?' : 'Cấp quyền quản trị cấp cao?'}
         description={
           isAdmin
             ? `${data.fullName} sẽ mất quyền vào khu quản trị và bị đăng xuất khỏi mọi thiết bị.`
