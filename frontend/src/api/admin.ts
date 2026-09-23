@@ -8,6 +8,7 @@ import type {
   ApiProductDetail,
   ApiProductSummary,
   ApiUser,
+  AdminPermission,
 } from '../types/api';
 import type { ProductQuery } from './catalog';
 import { api } from './client';
@@ -74,6 +75,7 @@ const adminPaths = {
   users: '/admin/users',
   user: '/admin/users/{id}',
   userRole: '/admin/users/{id}/role',
+  userAccess: '/admin/users/{id}/access',
   revokeSessions: '/admin/users/{id}/revoke-sessions',
   chatConversations: '/admin/chat/conversations',
   chatConversation: '/admin/chat/conversations/{id}',
@@ -185,7 +187,7 @@ export interface AdminUser {
   fullName: string;
   phone: string | null;
   avatarUrl: string | null;
-  role: 'USER' | 'ADMIN';
+  role: 'USER' | 'STAFF' | 'ADMIN';
   createdAt: string;
   _count: { orders: number; addresses: number };
 }
@@ -199,7 +201,7 @@ export interface AdminUserDetail extends AdminUser {
 
 export interface UserListQuery {
   search?: string;
-  role?: 'USER' | 'ADMIN';
+  role?: 'USER' | 'STAFF' | 'ADMIN';
   sort?: 'newest' | 'orders-desc' | 'name';
   page?: number;
   limit?: number;
@@ -492,6 +494,19 @@ const adminApi = {
     return api.patch<JsonResponse<'/admin/users/{id}/role', 'patch', 200>>(`/api${bindPath(adminPaths.userRole, id)}`, body);
   },
 
+  userAccess: (id: number) =>
+    api.get<JsonResponse<'/admin/users/{id}/access', 'get', 200>>(
+      `/api${bindPath(adminPaths.userAccess, id)}`,
+    ),
+
+  setUserAccess: (id: number, input: { role: 'USER' | 'STAFF'; permissions: AdminPermission[] }) => {
+    const body = input satisfies JsonRequestBody<'/admin/users/{id}/access', 'patch'>;
+    return api.patch<JsonResponse<'/admin/users/{id}/access', 'patch', 200>>(
+      `/api${bindPath(adminPaths.userAccess, id)}`,
+      body,
+    );
+  },
+
   revokeSessions: (id: number) =>
     api.post<JsonResponse<'/admin/users/{id}/revoke-sessions', 'post', 200>>(`/api${bindPath(adminPaths.revokeSessions, id)}`),
 
@@ -574,6 +589,8 @@ interface AdminGateway {
     list(query?: UserListQuery): Promise<ApiPaged<AdminUser>>;
     detail(id: number): Promise<{ user: AdminUserDetail }>;
     setRole(id: number, role: 'USER' | 'ADMIN'): Promise<{ user: AdminUser }>;
+    access(id: number): Promise<JsonResponse<'/admin/users/{id}/access', 'get', 200>>;
+    setAccess(id: number, input: { role: 'USER' | 'STAFF'; permissions: AdminPermission[] }): Promise<JsonResponse<'/admin/users/{id}/access', 'patch', 200>>;
     revokeSessions(id: number): Promise<{ revoked: number }>;
   };
   chat: {
@@ -601,7 +618,7 @@ export const adminGateway: AdminGateway = {
   categories: { list: adminApi.categories, create: adminApi.createCategory, update: adminApi.updateCategory, remove: adminApi.removeCategory },
   banners: { list: adminApi.banners, create: adminApi.createBanner, update: adminApi.updateBanner, setActive: adminApi.setBannerActive, replaceImage: adminApi.replaceBannerImage },
   orders: { list: adminApi.orders, detail: adminApi.order, setStatus: adminApi.setOrderStatus, setPaymentStatus: adminApi.setPaymentStatus },
-  users: { list: adminApi.users, detail: adminApi.user, setRole: adminApi.setUserRole, revokeSessions: adminApi.revokeSessions },
+  users: { list: adminApi.users, detail: adminApi.user, setRole: adminApi.setUserRole, access: adminApi.userAccess, setAccess: adminApi.setUserAccess, revokeSessions: adminApi.revokeSessions },
   chat: {
     list: adminApi.chatConversations,
     detail: adminApi.chatConversation,

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { requireAdmin, requireAuth } from '../../middleware/auth.js';
+import { requireAuth, requirePermission } from '../../middleware/auth.js';
 import { uploadLimiter } from '../../middleware/rateLimit.js';
 import { uploadProductImages } from '../../middleware/upload.js';
 import {
@@ -25,7 +25,7 @@ productRouter.get('/:slug', detailHandler);
 
 /** /api/admin/products — chỉ quản trị viên. */
 export const adminProductRouter = Router();
-adminProductRouter.use(requireAuth, requireAdmin);
+adminProductRouter.use(requireAuth, requirePermission('CATALOG'));
 adminProductRouter.get('/', adminListHandler);
 adminProductRouter.get('/:id', adminDetailHandler);
 adminProductRouter.post('/', createHandler);
@@ -38,5 +38,5 @@ adminProductRouter.patch('/:id/images/order', reorderImagesHandler);
 
 /** /api/admin/product-images/:id */
 export const adminProductImageRouter = Router();
-adminProductImageRouter.use(requireAuth, requireAdmin);
+adminProductImageRouter.use(requireAuth, requirePermission('CATALOG'));
 adminProductImageRouter.delete('/:id', removeImageHandler);

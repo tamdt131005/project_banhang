@@ -4,7 +4,8 @@
   "private": true,
   "description": "Website ban hang - backend Express + Prisma/MariaDB, frontend React + Vite",
   "scripts": {
-    "dev": "concurrently -n backend,frontend -c cyan,magenta \"npm --prefix backend run dev\" \"npm --prefix frontend run dev\"",
+    "dev": "concurrently -n backend,frontend,chat -c cyan,magenta,green \"npm --prefix backend run dev\" \"npm --prefix frontend run dev\" \"npm --prefix chat-app run dev\"",
+    "dev:chat": "npm --prefix chat-app run dev",
     "dev:backend": "npm --prefix backend run dev",
     "dev:frontend": "npm --prefix frontend run dev",
     "build": "npm --prefix backend run build && npm --prefix frontend run build",

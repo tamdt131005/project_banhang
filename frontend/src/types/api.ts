@@ -1,5 +1,14 @@
 import type { OrderStatus } from '../lib/format';
 
+export type AdminPermission =
+  | 'DASHBOARD'
+  | 'ORDERS'
+  | 'INVENTORY'
+  | 'CATALOG'
+  | 'BANNERS'
+  | 'CUSTOMERS'
+  | 'SUPPORT';
+
 export interface ApiUser {
   id: number;
   email: string;
@@ -7,7 +16,8 @@ export interface ApiUser {
   phone: string | null;
   /** Đường dẫn /uploads/... của ảnh đại diện; null = dùng avatar chữ viết tắt. */
   avatarUrl: string | null;
-  role: 'USER' | 'ADMIN';
+  role: 'USER' | 'STAFF' | 'ADMIN';
+  adminPermissions: AdminPermission[];
 }
 
 export interface ApiCategory {

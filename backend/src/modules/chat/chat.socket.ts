@@ -8,6 +8,7 @@ import { verifyAccessToken } from '../../lib/jwt.js';
 import { prisma } from '../../lib/prisma.js';
 import { AppError } from '../../middleware/error.js';
 import { chatEvents } from './chat.events.js';
+import { hasAdminAccess, userHasPermission } from '../permissions/permission.service.js';
 
 interface ChatSocketData {
   user: { id: number; email: string; role: Role };
@@ -70,7 +71,8 @@ export function attachChatSocket(httpServer: HttpServer) {
           select: { userId: true },
         });
         if (!conversation) throw AppError.notFound('Không tìm thấy cuộc trò chuyện này.');
-        if (socket.data.user.role !== 'ADMIN' && conversation.userId !== socket.data.user.id) {
+        const isStaff = await userHasPermission(socket.data.user.id, 'SUPPORT');
+        if (!(await hasAdminAccess(socket.data.user.id)) && conversation.userId !== socket.data.user.id && !isStaff) {
           throw AppError.forbidden();
         }
         await socket.join(`conversation:${conversationId}`);
@@ -82,7 +84,7 @@ export function attachChatSocket(httpServer: HttpServer) {
 
     socket.on('support:subscribe', async (ack?: Ack) => {
       try {
-        if (socket.data.user.role !== 'ADMIN') throw AppError.forbidden();
+        if (!(await userHasPermission(socket.data.user.id, 'SUPPORT'))) throw AppError.forbidden();
         await socket.join('support:admins');
         ack?.({ ok: true });
       } catch (error) {

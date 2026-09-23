@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { requireAdmin, requireAuth } from '../../middleware/auth.js';
+import { requireAuth, requirePermission } from '../../middleware/auth.js';
 import {
   createHandler,
   removeHandler,
@@ -13,7 +13,7 @@ categoryRouter.get('/', treeHandler);
 
 /** /api/admin/categories — chỉ quản trị viên. */
 export const adminCategoryRouter = Router();
-adminCategoryRouter.use(requireAuth, requireAdmin);
+adminCategoryRouter.use(requireAuth, requirePermission('CATALOG'));
 adminCategoryRouter.get('/', treeHandler);
 adminCategoryRouter.post('/', createHandler);
 adminCategoryRouter.patch('/:id', updateHandler);

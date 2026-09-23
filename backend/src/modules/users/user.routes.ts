@@ -1,17 +1,21 @@
 import { Router } from 'express';
-import { requireAdmin, requireAuth } from '../../middleware/auth.js';
+import { requireAdmin, requireAuth, requirePermission } from '../../middleware/auth.js';
 import {
   detailHandler,
   listHandler,
   revokeSessionsHandler,
+  staffAccessHandler,
   updateRoleHandler,
+  updateStaffAccessHandler,
 } from './user.controller.js';
 
 /** /api/admin/users — hồ sơ khách hàng và phân quyền. */
 export const adminUserRouter = Router();
-adminUserRouter.use(requireAuth, requireAdmin);
+adminUserRouter.use(requireAuth);
 
-adminUserRouter.get('/', listHandler);
-adminUserRouter.get('/:id', detailHandler);
-adminUserRouter.patch('/:id/role', updateRoleHandler);
-adminUserRouter.post('/:id/revoke-sessions', revokeSessionsHandler);
+adminUserRouter.get('/', requirePermission('CUSTOMERS'), listHandler);
+adminUserRouter.get('/:id', requirePermission('CUSTOMERS'), detailHandler);
+adminUserRouter.get('/:id/access', requireAdmin, staffAccessHandler);
+adminUserRouter.patch('/:id/access', requireAdmin, updateStaffAccessHandler);
+adminUserRouter.patch('/:id/role', requireAdmin, updateRoleHandler);
+adminUserRouter.post('/:id/revoke-sessions', requireAdmin, revokeSessionsHandler);

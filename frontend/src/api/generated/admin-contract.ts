@@ -500,6 +500,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/users/{id}/access": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getAdminUserAccess"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["updateAdminUserAccess"];
+        trace?: never;
+    };
     "/admin/users/{id}/role": {
         parameters: {
             query?: never;
@@ -543,7 +559,9 @@ export interface components {
         /** @enum {string} */
         PaymentMethod: "COD" | "MOMO";
         /** @enum {string} */
-        Role: "USER" | "ADMIN";
+        Role: "USER" | "STAFF" | "ADMIN";
+        /** @enum {string} */
+        StaffPermission: "DASHBOARD" | "ORDERS" | "INVENTORY" | "CATALOG" | "BANNERS" | "CUSTOMERS" | "SUPPORT";
         /** @enum {string} */
         ConversationStatus: "AI" | "WAITING_ADMIN" | "LIVE" | "CLOSED";
         /** @enum {string} */
@@ -828,6 +846,12 @@ export interface components {
                     name: string;
                 };
             };
+        };
+        UserStaffAccess: {
+            id: number;
+            /** @enum {string} */
+            role: "USER" | "STAFF";
+            permissions: components["schemas"]["StaffPermission"][];
         };
         AdminUser: {
             id: number;
@@ -2013,6 +2037,62 @@ export interface operations {
             };
         };
     };
+    getAdminUserAccess: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Staff access */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        access: components["schemas"]["UserStaffAccess"];
+                    };
+                };
+            };
+        };
+    };
+    updateAdminUserAccess: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    role: "USER" | "STAFF";
+                    permissions: components["schemas"]["StaffPermission"][];
+                };
+            };
+        };
+        responses: {
+            /** @description Staff access updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        access: components["schemas"]["UserStaffAccess"];
+                    };
+                };
+            };
+        };
+    };
     updateAdminUserRole: {
         parameters: {
             query?: never;
@@ -2025,7 +2105,8 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    role: components["schemas"]["Role"];
+                    /** @enum {string} */
+                    role: "USER" | "ADMIN";
                 };
             };
         };
