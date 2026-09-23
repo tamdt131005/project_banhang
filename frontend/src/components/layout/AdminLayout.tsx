@@ -167,13 +167,14 @@ export function AdminLayout({ className = '' }: Readonly<AdminLayoutProps>) {
             <div className="ml-auto flex items-center gap-1.5">
               <Link
                 to="/"
-                className="hidden h-9 items-center gap-1.5 rounded-control border border-line px-3 text-xs font-medium transition-colors duration-[160ms] hover:bg-sunken sm:inline-flex lg:hidden"
+                aria-label="Xem cửa hàng"
+                className="inline-flex h-9 items-center gap-1.5 rounded-control border border-line px-3 text-xs font-medium transition-colors duration-[160ms] hover:bg-sunken lg:hidden"
               >
                 <StoreIcon className="size-4" />
-                Xem cửa hàng
+                <span className="hidden sm:inline">Xem cửa hàng</span>
               </Link>
               <ThemeToggle />
-              <UserMenu user={user} />
+              <UserMenu user={user} area="admin" />
             </div>
           </div>
 

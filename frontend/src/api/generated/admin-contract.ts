@@ -484,6 +484,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/users/staff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Only the shop owner can create staff accounts. Customer accounts cannot be converted to staff. */
+        post: operations["createAdminStaff"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/users/{id}": {
         parameters: {
             query?: never;
@@ -850,7 +867,7 @@ export interface components {
         UserStaffAccess: {
             id: number;
             /** @enum {string} */
-            role: "USER" | "STAFF";
+            role: "STAFF";
             permissions: components["schemas"]["StaffPermission"][];
         };
         AdminUser: {
@@ -2013,6 +2030,39 @@ export interface operations {
             };
         };
     };
+    createAdminStaff: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: email */
+                    email: string;
+                    password: string;
+                    fullName: string;
+                    phone?: string;
+                    permissions: components["schemas"]["StaffPermission"][];
+                };
+            };
+        };
+        responses: {
+            /** @description Staff created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        user: components["schemas"]["AdminUser"];
+                    };
+                };
+            };
+        };
+    };
     getAdminUser: {
         parameters: {
             query?: never;
@@ -2073,8 +2123,6 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    /** @enum {string} */
-                    role: "USER" | "STAFF";
                     permissions: components["schemas"]["StaffPermission"][];
                 };
             };

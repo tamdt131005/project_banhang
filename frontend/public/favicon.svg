@@ -1,19 +1,19 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
   <defs>
-    <linearGradient id="td-favicon-gradient" x1="9" y1="5" x2="39" y2="43" gradientUnits="userSpaceOnUse">
+    <linearGradient id="ma-favicon-gradient" x1="9" y1="5" x2="39" y2="43" gradientUnits="userSpaceOnUse">
       <stop stop-color="#FF7A1A" />
       <stop offset="1" stop-color="#F4511E" />
     </linearGradient>
   </defs>
   <rect x="4" y="5" width="40" height="40" rx="12" fill="#C83A12" />
-  <rect x="3" y="2" width="42" height="41" rx="13" fill="url(#td-favicon-gradient)" stroke="#B8320B" />
+  <rect x="3" y="2" width="42" height="41" rx="13" fill="url(#ma-favicon-gradient)" stroke="#B8320B" />
   <path d="M10 11.5C15.5 5.7 32.2 4.2 38.5 9.4" stroke="#FFF" stroke-opacity=".34" stroke-width="1.5" stroke-linecap="round" />
   <g fill="none" stroke="#7C2108" stroke-opacity=".22" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" transform="translate(0 1)">
-    <path d="M11.5 15.5H25M18.25 15.5V34" />
-    <path d="M27.5 15.5V34M27.5 15.5H30.5C40 15.5 40 34 30.5 34H27.5" />
+    <path d="M8.5 33V16L16 27L23.5 16V33" />
+    <path d="M27 33L34 16L41 33M29.5 27H38.5" />
   </g>
   <g fill="none" stroke="#FFF" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M11.5 15.5H25M18.25 15.5V34" />
-    <path d="M27.5 15.5V34M27.5 15.5H30.5C40 15.5 40 34 30.5 34H27.5" />
+    <path d="M8.5 33V16L16 27L23.5 16V33" />
+    <path d="M27 33L34 16L41 33M29.5 27H38.5" />
   </g>
 </svg>

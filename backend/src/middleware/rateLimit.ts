@@ -72,6 +72,33 @@ export const registerLimiter = rateLimit({
   handler: reject('Đã tạo quá nhiều tài khoản từ địa chỉ này. Vui lòng thử lại sau 1 giờ.'),
 });
 
+/** Keep OTP delivery bounded per IP and normalized email address. */
+export const emailOtpRequestLimiter = rateLimit({
+  ...shared,
+  store: newStore(),
+  windowMs: HOUR,
+  limit: 5,
+  keyGenerator: (req) => {
+    const body = req.body as { email?: unknown } | undefined;
+    const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : '';
+    return `${ipKeyGenerator(req.ip ?? '')}|${email}`;
+  },
+  handler: reject('Bạn yêu cầu mã xác nhận quá nhiều lần. Vui lòng thử lại sau.'),
+});
+
+export const emailOtpVerifyLimiter = rateLimit({
+  ...shared,
+  store: newStore(),
+  windowMs: 15 * MINUTE,
+  limit: 20,
+  keyGenerator: (req) => {
+    const body = req.body as { email?: unknown } | undefined;
+    const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : '';
+    return `${ipKeyGenerator(req.ip ?? '')}|${email}`;
+  },
+  handler: reject('Bạn nhập mã xác nhận quá nhiều lần. Vui lòng thử lại sau.'),
+});
+
 export const refreshLimiter = rateLimit({
   ...shared,
   store: newStore(),
@@ -87,6 +114,15 @@ export const refreshLimiter = rateLimit({
 function perUserKey(req: Request) {
   return req.user ? `user:${req.user.id}` : ipKeyGenerator(req.ip ?? '');
 }
+
+export const changePasswordLimiter = rateLimit({
+  ...shared,
+  store: newStore(),
+  windowMs: HOUR,
+  limit: 10,
+  keyGenerator: perUserKey,
+  handler: reject('Bạn thử đổi mật khẩu quá nhiều lần. Vui lòng chờ 1 giờ.'),
+});
 
 export const orderLimiter = rateLimit({
   ...shared,

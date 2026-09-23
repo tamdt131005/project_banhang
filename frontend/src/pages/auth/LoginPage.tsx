@@ -6,11 +6,9 @@ import { TextField } from '../../components/ui/Field';
 import { Alert } from '../../components/ui/Feedback';
 import { useAuth } from '../../context/AuthContext';
 import { errorMessage, fieldErrors } from '../../lib/errors';
+import { staffLandingPath } from '../../lib/staffLanding';
 
-/** Trang định tuyến không nhận prop; dữ liệu lấy từ URL và API. */
-export interface LoginPageProps {}
-
-export function LoginPage({}: Readonly<LoginPageProps>) {
+export function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -31,8 +29,11 @@ export function LoginPage({}: Readonly<LoginPageProps>) {
     setFields({});
 
     try {
-      await login({ email, password });
-      void navigate(from, { replace: true });
+      const user = await login({ email, password });
+      const destination = user.role === 'USER'
+        ? (from.startsWith('/admin') ? '/' : from)
+        : staffLandingPath(user);
+      void navigate(destination, { replace: true });
     } catch (error) {
       setMessage(errorMessage(error));
       setFields(fieldErrors(error));
@@ -44,7 +45,7 @@ export function LoginPage({}: Readonly<LoginPageProps>) {
   return (
     <AuthShell
       title="Chào mừng trở lại"
-      subtitle="Đăng nhập để tiếp tục giỏ hàng đang dở và theo dõi đơn của bạn."
+      subtitle="Đăng nhập để tiếp tục mua sắm hoặc vào khu làm việc của bạn."
       imageSeed="tamdang-dang-nhap"
     >
       <form onSubmit={handleSubmit} className="space-y-5">
@@ -77,11 +78,15 @@ export function LoginPage({}: Readonly<LoginPageProps>) {
         </Button>
       </form>
 
+      <p className="mt-4 text-center text-sm">
+        <Link to="/quen-mat-khau" className="font-medium text-accent hover:underline">
+          Quên mật khẩu?
+        </Link>
+      </p>
+
       <p className="mt-8 text-center text-sm text-ink-muted">
         Bạn chưa có tài khoản?{' '}
-        <Link to="/dang-ky" className="font-semibold text-accent hover:underline">
-          Đăng ký ngay
-        </Link>
+        <Link to="/dang-ky" className="font-semibold text-accent hover:underline">Đăng ký ngay</Link>
       </p>
     </AuthShell>
   );

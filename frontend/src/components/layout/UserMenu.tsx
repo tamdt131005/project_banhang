@@ -2,11 +2,13 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import type { ApiUser } from '../../types/api';
+import { staffLandingPath } from '../../lib/staffLanding';
 import { Avatar } from '../ui/Avatar';
 import { LogoutIcon, PinIcon, ReceiptIcon, ShieldIcon, UserIcon } from '../ui/icons';
 
 export interface UserMenuProps {
   user: ApiUser;
+  area?: 'shop' | 'admin';
 }
 
 /* Hàng phủ kín mép menu, không bo riêng — panel đã overflow-hidden cắt góc. */
@@ -18,10 +20,10 @@ const ITEM_CLASS =
  * chạm/bấm để mở trên di động. Gom mọi lối vào tài khoản về một chỗ —
  * hồ sơ, sổ địa chỉ, đơn mua, trang quản trị — thay vì rải link chữ.
  */
-export function UserMenu({ user }: Readonly<UserMenuProps>) {
+export function UserMenu({ user, area = 'shop' }: Readonly<UserMenuProps>) {
   const navigate = useNavigate();
   const location = useLocation();
-  const { isAdmin, logout } = useAuth();
+  const { logout } = useAuth();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -86,11 +88,14 @@ export function UserMenu({ user }: Readonly<UserMenuProps>) {
     setOpen((value) => !value);
   }
 
-  const links = [
+  const shopLinks = [
     { label: 'Hồ sơ của tôi', to: '/tai-khoan', icon: <UserIcon /> },
     { label: 'Sổ địa chỉ', to: '/dia-chi', icon: <PinIcon /> },
     { label: 'Đơn mua', to: '/don-hang', icon: <ReceiptIcon /> },
   ];
+  const links = area === 'admin'
+    ? [{ label: 'Tài khoản & mật khẩu', to: '/admin/tai-khoan', icon: <UserIcon /> }]
+    : shopLinks;
 
   return (
     <div
@@ -132,14 +137,14 @@ export function UserMenu({ user }: Readonly<UserMenuProps>) {
                 {item.label}
               </Link>
             ))}
-            {isAdmin ? (
+            {area === 'shop' && user.role !== 'USER' ? (
               <Link
-                to="/admin/san-pham"
+                to={staffLandingPath(user)}
                 onClick={() => setOpen(false)}
                 className="flex items-center gap-2.5 px-4 py-2 text-sm font-medium text-accent transition-colors duration-[160ms] hover:bg-accent-soft"
               >
                 <ShieldIcon />
-                Trang quản trị
+                Khu làm việc
               </Link>
             ) : null}
           </nav>

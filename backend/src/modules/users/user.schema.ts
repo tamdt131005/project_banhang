@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { STAFF_PERMISSIONS } from '../permissions/permission.constants.js';
+import { emailSchema, passwordSchema, phoneSchema } from '../../lib/validators.js';
 
 export const userListQuerySchema = z.object({
   /** Tìm theo tên hoặc email. */
@@ -14,21 +15,24 @@ export const roleUpdateSchema = z.object({
   role: z.enum(['USER', 'ADMIN']),
 });
 
+const permissionsSchema = z.array(z.enum(STAFF_PERMISSIONS))
+  .min(1, 'Nhân viên cần ít nhất một quyền.')
+  .max(STAFF_PERMISSIONS.length)
+  .refine((permissions) => new Set(permissions).size === permissions.length, 'Không thể chọn trùng quyền.');
+
 export const staffAccessSchema = z.object({
-  role: z.enum(['USER', 'STAFF']),
-  permissions: z.array(z.enum(STAFF_PERMISSIONS)).max(STAFF_PERMISSIONS.length),
-}).superRefine((input, context) => {
-  if (input.role === 'USER' && input.permissions.length > 0) {
-    context.addIssue({ code: 'custom', message: 'Khách hàng không thể có quyền quản trị.', path: ['permissions'] });
-  }
-  if (input.role === 'STAFF' && input.permissions.length === 0) {
-    context.addIssue({ code: 'custom', message: 'Nhân viên cần ít nhất một quyền.', path: ['permissions'] });
-  }
-  if (new Set(input.permissions).size !== input.permissions.length) {
-    context.addIssue({ code: 'custom', message: 'Không thể chọn trùng quyền.', path: ['permissions'] });
-  }
+  permissions: permissionsSchema,
+}).strict();
+
+export const staffCreateSchema = z.object({
+  email: emailSchema,
+  password: passwordSchema,
+  fullName: z.string().trim().min(2, 'Họ tên quá ngắn').max(120, 'Họ tên quá dài'),
+  phone: phoneSchema.optional(),
+  permissions: permissionsSchema,
 });
 
 export type UserListQuery = z.infer<typeof userListQuerySchema>;
 export type RoleUpdateInput = z.infer<typeof roleUpdateSchema>;
 export type StaffAccessInput = z.infer<typeof staffAccessSchema>;
+export type StaffCreateInput = z.infer<typeof staffCreateSchema>;

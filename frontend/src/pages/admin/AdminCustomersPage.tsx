@@ -5,7 +5,7 @@ import { adminGateway } from '../../api/admin';
 import { Avatar } from '../../components/ui/Avatar';
 import { Alert, EmptyState, Skeleton } from '../../components/ui/Feedback';
 import { Pagination } from '../../components/ui/Pagination';
-import { ChevronRightIcon, SearchIcon, ShieldIcon, UserIcon } from '../../components/ui/icons';
+import { ChevronRightIcon, SearchIcon, UserIcon } from '../../components/ui/icons';
 import { errorMessage } from '../../lib/errors';
 import { formatDateTime } from '../../lib/format';
 
@@ -22,7 +22,6 @@ export function AdminCustomersPage({}: Readonly<AdminCustomersPageProps>) {
   const [params, setParams] = useSearchParams();
 
   const search = params.get('search') ?? '';
-  const role = params.get('role') ?? '';
   const sort = (params.get('sort') ?? 'newest') as (typeof SORTS)[number]['value'];
   const page = Number(params.get('page') ?? 1);
 
@@ -40,11 +39,11 @@ export function AdminCustomersPage({}: Readonly<AdminCustomersPageProps>) {
   }
 
   const users = useQuery({
-    queryKey: ['admin', 'users', { search, role, sort, page }],
+    queryKey: ['admin', 'users', { search, role: 'USER', sort, page }],
     queryFn: () =>
       adminGateway.users.list({
         ...(search ? { search } : {}),
-        ...(role ? { role: role as 'USER' | 'STAFF' | 'ADMIN' } : {}),
+        role: 'USER',
         sort,
         page,
         limit: 20,
@@ -62,7 +61,7 @@ export function AdminCustomersPage({}: Readonly<AdminCustomersPageProps>) {
         <div>
           <h1 className="text-xl font-semibold">Khách hàng</h1>
           <p className="mt-0.5 text-sm text-ink-muted">
-            Danh sách tài khoản đã đăng ký, số đơn đã đặt và quyền truy cập.
+            Danh sách tài khoản khách hàng đã đăng ký và số đơn đã đặt.
           </p>
         </div>
         {users.data ? (
@@ -88,28 +87,6 @@ export function AdminCustomersPage({}: Readonly<AdminCustomersPageProps>) {
             className="h-9 w-full rounded-control border border-line bg-sunken pr-3 pl-9 text-sm outline-none focus:border-accent"
           />
         </form>
-
-        <div className="flex gap-1.5">
-          {[
-            { value: '', label: 'Tất cả' },
-            { value: 'USER', label: 'Khách' },
-            { value: 'STAFF', label: 'Nhân viên' },
-            { value: 'ADMIN', label: 'Quản trị' },
-          ].map((option) => (
-            <button
-              key={option.value || 'all'}
-              type="button"
-              onClick={() => update({ role: option.value || undefined })}
-              className={`h-9 shrink-0 rounded-control border px-3 text-xs font-medium transition-colors duration-[160ms] ${
-                role === option.value
-                  ? 'border-accent bg-accent-soft text-accent'
-                  : 'border-line hover:bg-sunken'
-              }`}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
 
         <label className="flex shrink-0 items-center gap-2 text-sm">
           <span className="text-ink-muted">Sắp xếp</span>
@@ -160,12 +137,6 @@ export function AdminCustomersPage({}: Readonly<AdminCustomersPageProps>) {
                         <div className="min-w-0">
                           <p className="flex items-center gap-1.5 text-sm font-semibold text-ink">
                             <span className="line-clamp-1">{user.fullName}</span>
-                            {user.role !== 'USER' ? (
-                              <span className="inline-flex shrink-0 items-center gap-1 rounded-control bg-accent-soft px-1.5 py-0.5 text-[0.625rem] font-bold text-accent">
-                                <ShieldIcon className="size-3" />
-                                {user.role === 'ADMIN' ? 'Quản trị' : 'Nhân viên'}
-                              </span>
-                            ) : null}
                           </p>
                           <p className="line-clamp-1 text-xs text-ink-muted">{user.email}</p>
                         </div>

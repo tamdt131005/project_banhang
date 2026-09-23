@@ -1,7 +1,8 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { Skeleton } from '../components/ui/Feedback';
 import { useAuth } from '../context/AuthContext';
-import type { AdminPermission, ApiUser } from '../types/api';
+import type { AdminPermission } from '../types/api';
+import { staffLandingPath } from '../lib/staffLanding';
 
 export interface GuardProps {
   /** Nơi chuyển tới khi không đủ điều kiện vào. */
@@ -53,27 +54,11 @@ export function AdminRoute({ redirectTo = '/' }: Readonly<GuardProps>) {
   return <Outlet />;
 }
 
-const STAFF_LANDING_PATHS: [AdminPermission, string][] = [
-  ['DASHBOARD', '/admin'],
-  ['ORDERS', '/admin/don-hang'],
-  ['SUPPORT', '/admin/ho-tro'],
-  ['CUSTOMERS', '/admin/khach-hang'],
-  ['CATALOG', '/admin/san-pham'],
-  ['INVENTORY', '/admin/kho'],
-  ['BANNERS', '/admin/banner'],
-];
-
-function firstAllowedPath(user: ApiUser) {
-  return STAFF_LANDING_PATHS.find(([permission]) =>
-    user.role === 'ADMIN' || user.adminPermissions.includes(permission),
-  )?.[1] ?? '/';
-}
-
 export function AdminPermissionRoute({ permission }: Readonly<{ permission: AdminPermission }>) {
   const { user, can, isLoading } = useAuth();
   if (isLoading) return <Loading />;
   if (!user || !can(permission)) {
-    return <Navigate to={user ? firstAllowedPath(user) : '/dang-nhap'} replace />;
+    return <Navigate to={user ? staffLandingPath(user) : '/dang-nhap'} replace />;
   }
   return <Outlet />;
 }
@@ -82,7 +67,7 @@ export function AdminOwnerRoute() {
   const { user, isLoading } = useAuth();
   if (isLoading) return <Loading />;
   if (!user || user.role !== 'ADMIN') {
-    return <Navigate to={user ? firstAllowedPath(user) : '/dang-nhap'} replace />;
+    return <Navigate to={user ? staffLandingPath(user) : '/dang-nhap'} replace />;
   }
   return <Outlet />;
 }

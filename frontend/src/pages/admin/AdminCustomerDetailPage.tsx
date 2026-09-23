@@ -162,13 +162,13 @@ export function AdminCustomerDetailPage({}: Readonly<AdminCustomerDetailPageProp
             </p>
 
             <div className="flex flex-wrap gap-2 pt-1">
-              {canManageAccess && !isAdmin ? (
+              {canManageAccess && isStaff ? (
                 <Link
-                  to={`/admin/phan-quyen?role=${isStaff ? 'STAFF' : 'USER'}&id=${data.id}`}
+                  to={`/admin/phan-quyen?id=${data.id}`}
                   className="inline-flex h-8 items-center gap-1.5 rounded-control border border-line bg-surface px-3 text-xs font-medium text-ink transition hover:border-accent hover:text-accent"
                 >
                   <ShieldIcon className="size-3.5" />
-                  {isStaff ? 'Chỉnh quyền nhân viên' : 'Gắn quyền nhân viên'}
+                  Chỉnh quyền nhân viên
                 </Link>
               ) : null}
               {canManageAccess && !isSelf ? (

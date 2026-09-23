@@ -1,7 +1,15 @@
 import type { RequestHandler } from 'express';
+import { env } from '../../config/env.js';
 import { REFRESH_COOKIE, clearAuthCookies, setAuthCookies } from '../../lib/cookies.js';
 import { AppError } from '../../middleware/error.js';
-import { loginSchema, registerSchema, updateProfileSchema } from './auth.schema.js';
+import {
+  changePasswordSchema,
+  loginSchema,
+  registerSchema,
+  requestEmailOtpSchema,
+  resetPasswordSchema,
+  updateProfileSchema,
+} from './auth.schema.js';
 import * as authService from './auth.service.js';
 
 function readRefreshCookie(req: Parameters<RequestHandler>[0]): string | undefined {
@@ -15,6 +23,31 @@ export const registerHandler: RequestHandler = async (req, res) => {
 
   setAuthCookies(res, tokens.accessToken, tokens.refreshToken);
   res.status(201).json({ user });
+};
+
+export const requestRegistrationOtpHandler: RequestHandler = async (req, res) => {
+  const { email } = requestEmailOtpSchema.parse(req.body);
+  await authService.requestRegistrationOtp(email);
+  res.status(202).json({
+    message: 'Nếu email có thể đăng ký, mã xác nhận sẽ được gửi.',
+    retryAfterSeconds: env.EMAIL_OTP_RESEND_SECONDS,
+  });
+};
+
+export const requestPasswordResetOtpHandler: RequestHandler = async (req, res) => {
+  const { email } = requestEmailOtpSchema.parse(req.body);
+  await authService.requestPasswordResetOtp(email);
+  res.status(202).json({
+    message: 'Nếu email đã đăng ký, mã xác nhận sẽ được gửi.',
+    retryAfterSeconds: env.EMAIL_OTP_RESEND_SECONDS,
+  });
+};
+
+export const resetPasswordHandler: RequestHandler = async (req, res) => {
+  const input = resetPasswordSchema.parse(req.body);
+  await authService.resetPassword(input);
+  clearAuthCookies(res);
+  res.status(204).end();
 };
 
 export const loginHandler: RequestHandler = async (req, res) => {
@@ -53,6 +86,13 @@ export const updateMeHandler: RequestHandler = async (req, res) => {
   const input = updateProfileSchema.parse(req.body);
   const user = await authService.updateProfile(req.user!.id, input);
   res.json({ user });
+};
+
+export const changePasswordHandler: RequestHandler = async (req, res) => {
+  const input = changePasswordSchema.parse(req.body);
+  await authService.changePassword(req.user!.id, input);
+  clearAuthCookies(res);
+  res.status(204).end();
 };
 
 export const updateAvatarHandler: RequestHandler = async (req, res) => {

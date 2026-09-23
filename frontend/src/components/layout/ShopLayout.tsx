@@ -85,7 +85,7 @@ export function ShopLayout({ className = '' }: Readonly<ShopLayoutProps>) {
 
         <div className="border-t border-line">
           <p className="mx-auto max-w-[1280px] px-4 py-4 text-center text-xs text-ink-muted">
-            © 2026 TÂM ĐẶNG — tiệm quần áo trực tuyến, dự án học tập
+            © 2026 MAY AN — tiệm quần áo trực tuyến, dự án học tập
           </p>
         </div>
       </footer>

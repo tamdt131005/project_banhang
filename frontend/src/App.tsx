@@ -16,8 +16,10 @@ import { AdminProductFormPage } from './pages/admin/AdminProductFormPage';
 import { AdminProductsPage } from './pages/admin/AdminProductsPage';
 import { AdminSupportPage } from './pages/admin/AdminSupportPage';
 import { AdminPermissionsPage } from './pages/admin/AdminPermissionsPage';
+import { AdminAccountPage } from './pages/admin/AdminAccountPage';
 import { LoginPage } from './pages/auth/LoginPage';
 import { RegisterPage } from './pages/auth/RegisterPage';
+import { ForgotPasswordPage } from './pages/auth/ForgotPasswordPage';
 import { AddressesPage } from './pages/shop/AddressesPage';
 import { CartPage } from './pages/shop/CartPage';
 import { CheckoutPage } from './pages/shop/CheckoutPage';
@@ -43,8 +45,8 @@ export default function App({}: Readonly<AppProps>) {
       <Route element={<AuthLayout />}>
         <Route path="dang-nhap" element={<LoginPage />} />
         <Route path="dang-ky" element={<RegisterPage />} />
+        <Route path="quen-mat-khau" element={<ForgotPasswordPage />} />
       </Route>
-
       <Route element={<ShopLayout />}>
         <Route index element={<HomePage />} />
         <Route path="san-pham" element={<ProductsPage />} />
@@ -69,6 +71,7 @@ export default function App({}: Readonly<AppProps>) {
 
       <Route element={<AdminRoute />}>
         <Route path="admin" element={<AdminLayout />}>
+          <Route path="tai-khoan" element={<AdminAccountPage />} />
           <Route element={<AdminPermissionRoute permission="DASHBOARD" />}>
             <Route index element={<AdminDashboardPage />} />
           </Route>

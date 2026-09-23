@@ -1,6 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { type ReactNode, createContext, useContext, useMemo } from 'react';
-import { type LoginInput, type RegisterInput, type UpdateProfileInput, authApi } from '../api/auth';
+import {
+  type ChangePasswordInput,
+  type EmailOtpRequestResult,
+  type LoginInput,
+  type RegisterInput,
+  type ResetPasswordInput,
+  type UpdateProfileInput,
+  authApi,
+} from '../api/auth';
 import { ApiError } from '../api/client';
 import type { AdminPermission, ApiUser } from '../types/api';
 
@@ -10,11 +18,15 @@ interface AuthContextValue {
   isAdmin: boolean;
   can: (permission: AdminPermission) => boolean;
   login: (input: LoginInput) => Promise<ApiUser>;
+  requestRegistrationOtp: (email: string) => Promise<EmailOtpRequestResult>;
   register: (input: RegisterInput) => Promise<ApiUser>;
+  requestPasswordResetOtp: (email: string) => Promise<EmailOtpRequestResult>;
+  resetPassword: (input: ResetPasswordInput) => Promise<void>;
   updateProfile: (input: UpdateProfileInput) => Promise<ApiUser>;
   uploadAvatar: (file: File) => Promise<ApiUser>;
   removeAvatar: () => Promise<ApiUser>;
   logout: () => Promise<void>;
+  changePassword: (input: ChangePasswordInput) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -58,6 +70,25 @@ export function AuthProvider({ children }: Readonly<AuthProviderProps>) {
     },
   });
 
+  const requestRegistrationOtpMutation = useMutation({
+    mutationFn: (email: string) => authApi.requestRegistrationOtp(email),
+  });
+
+  const requestPasswordResetOtpMutation = useMutation({
+    mutationFn: (email: string) => authApi.requestPasswordResetOtp(email),
+  });
+
+  const resetPasswordMutation = useMutation({
+    mutationFn: (input: ResetPasswordInput) => authApi.resetPassword(input),
+    onSuccess: () => {
+      queryClient.setQueryData(['me'], null);
+      queryClient.removeQueries({ queryKey: ['cart'] });
+      queryClient.removeQueries({ queryKey: ['orders'] });
+      queryClient.removeQueries({ queryKey: ['addresses'] });
+      queryClient.removeQueries({ queryKey: ['chat'] });
+    },
+  });
+
   const updateProfileMutation = useMutation({
     mutationFn: (input: UpdateProfileInput) => authApi.updateMe(input),
     onSuccess: ({ user }) => {
@@ -92,6 +123,17 @@ export function AuthProvider({ children }: Readonly<AuthProviderProps>) {
     },
   });
 
+  const changePasswordMutation = useMutation({
+    mutationFn: (input: ChangePasswordInput) => authApi.changePassword(input),
+    onSuccess: () => {
+      queryClient.setQueryData(['me'], null);
+      queryClient.removeQueries({ queryKey: ['cart'] });
+      queryClient.removeQueries({ queryKey: ['orders'] });
+      queryClient.removeQueries({ queryKey: ['addresses'] });
+      queryClient.removeQueries({ queryKey: ['chat'] });
+    },
+  });
+
   const value = useMemo<AuthContextValue>(
     () => ({
       user: meQuery.data ?? null,
@@ -101,23 +143,35 @@ export function AuthProvider({ children }: Readonly<AuthProviderProps>) {
         meQuery.data?.role === 'ADMIN' ||
         (meQuery.data?.role === 'STAFF' && meQuery.data.adminPermissions.includes(permission)),
       login: async (input) => (await loginMutation.mutateAsync(input)).user,
+      requestRegistrationOtp: (email) => requestRegistrationOtpMutation.mutateAsync(email),
       register: async (input) => (await registerMutation.mutateAsync(input)).user,
+      requestPasswordResetOtp: (email) => requestPasswordResetOtpMutation.mutateAsync(email),
+      resetPassword: async (input) => {
+        await resetPasswordMutation.mutateAsync(input);
+      },
       updateProfile: async (input) => (await updateProfileMutation.mutateAsync(input)).user,
       uploadAvatar: async (file) => (await uploadAvatarMutation.mutateAsync(file)).user,
       removeAvatar: async () => (await removeAvatarMutation.mutateAsync()).user,
       logout: async () => {
         await logoutMutation.mutateAsync();
       },
+      changePassword: async (input) => {
+        await changePasswordMutation.mutateAsync(input);
+      },
     }),
     [
       meQuery.data,
       meQuery.isPending,
       loginMutation,
+      requestRegistrationOtpMutation,
       registerMutation,
+      requestPasswordResetOtpMutation,
+      resetPasswordMutation,
       updateProfileMutation,
       uploadAvatarMutation,
       removeAvatarMutation,
       logoutMutation,
+      changePasswordMutation,
     ],
   );
 

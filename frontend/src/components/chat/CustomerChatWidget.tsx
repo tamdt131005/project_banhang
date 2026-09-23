@@ -49,7 +49,7 @@ const STATUS_COPY: Record<ConversationStatus, { label: string; detail: string; b
   },
   LIVE: {
     label: 'Đang chat với nhân viên',
-    detail: 'Nhân viên hỗ trợ Tâm Đặng đang trực tiếp phản hồi bạn.',
+    detail: 'Nhân viên hỗ trợ May An đang trực tiếp phản hồi bạn.',
     badge: 'Trực tiếp',
   },
   CLOSED: {
@@ -297,7 +297,7 @@ function ChatMessageBubble({
       <div className={`max-w-[85%] space-y-1.5 ${isUser ? 'items-end' : 'items-start'}`}>
         {!isUser ? (
           <p className="px-1 text-[0.6875rem] font-semibold text-ink-muted">
-            {isAdmin ? message.sender?.fullName ?? 'Nhân viên hỗ trợ' : 'Trợ lý Tâm Đặng'}
+            {isAdmin ? message.sender?.fullName ?? 'Nhân viên hỗ trợ' : 'Trợ lý May An'}
           </p>
         ) : null}
 
@@ -607,7 +607,7 @@ export function CustomerChatWidget({}: Readonly<CustomerChatWidgetProps>) {
     <div className="fixed right-4 bottom-4 z-40 flex flex-col items-end gap-3 sm:right-6 sm:bottom-6">
       {isOpen ? (
         <section
-          aria-label="Hỗ trợ khách hàng Tâm Đặng"
+          aria-label="Hỗ trợ khách hàng May An"
           className="flex h-[min(48rem,calc(100dvh-5rem))] w-[min(26rem,calc(100vw-2rem))] sm:w-[28rem] flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-2xl transition-all"
         >
           {/* Header */}
@@ -626,7 +626,7 @@ export function CustomerChatWidget({}: Readonly<CustomerChatWidgetProps>) {
                     ? 'Lịch sử ticket'
                     : conversation
                       ? `Ticket #${conversation.id}`
-                      : 'Hỗ trợ Tâm Đặng'}
+                      : 'Hỗ trợ May An'}
                 </h2>
                 {!showHistory && statusCopy ? (
                   <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[0.625rem] font-bold text-accent">

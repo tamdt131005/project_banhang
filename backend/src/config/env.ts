@@ -29,6 +29,17 @@ const envSchema = z
     ACCESS_TOKEN_TTL: z.string().min(1).default('15m'),
     REFRESH_TOKEN_TTL: z.string().min(1).default('7d'),
 
+    SMTP_HOST: z.string().default(''),
+    SMTP_PORT: z.coerce.number().int().positive().default(587),
+    SMTP_SECURE: booleanEnv(false),
+    SMTP_USER: z.string().default(''),
+    SMTP_PASS: z.string().default(''),
+    MAIL_FROM: z.string().default(''),
+    EMAIL_OTP_HMAC_SECRET: z.string().default(''),
+    EMAIL_OTP_TTL_MINUTES: z.coerce.number().int().positive().max(1440).default(10),
+    EMAIL_OTP_MAX_ATTEMPTS: z.coerce.number().int().positive().max(10).default(5),
+    EMAIL_OTP_RESEND_SECONDS: z.coerce.number().int().positive().max(3600).default(60),
+
     UPLOAD_DIR: z.string().min(1).default('uploads'),
     MAX_UPLOAD_MB: z.coerce.number().int().positive().default(5),
 

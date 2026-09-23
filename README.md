@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="frontend/public/favicon.svg" width="88" height="88" alt="Logo Tâm Đặng">
+  <img src="frontend/public/favicon.svg" width="88" height="88" alt="Logo May An">
 </p>
 
-<h1 align="center">Tâm Đặng</h1>
+<h1 align="center">May An</h1>
 
 <p align="center">
   Nền tảng thương mại điện tử thời trang với cửa hàng trực tuyến, quản trị vận hành và hỗ trợ khách hàng theo thời gian thực.
@@ -35,7 +35,7 @@
 
 ## Tổng quan
 
-Tâm Đặng là ứng dụng bán hàng thời trang full-stack viết bằng TypeScript. Khách hàng có thể khám phá sản phẩm, quản lý giỏ hàng, đặt hàng COD và theo dõi đơn. Nhân viên quản trị vận hành danh mục, sản phẩm, tồn kho, đơn hàng, khách hàng, banner trang chủ và hàng đợi hỗ trợ trong cùng một hệ thống.
+May An là ứng dụng bán hàng thời trang full-stack viết bằng TypeScript. Khách hàng có thể khám phá sản phẩm, quản lý giỏ hàng, đặt hàng COD và theo dõi đơn. Nhân viên quản trị vận hành danh mục, sản phẩm, tồn kho, đơn hàng, khách hàng, banner trang chủ và hàng đợi hỗ trợ trong cùng một hệ thống.
 
 Dự án đang phục vụ môi trường phát triển cục bộ. Cấu hình thanh toán MoMo đã được đặt chỗ nhưng chưa đấu nối; không xem hệ thống hiện tại là bản sẵn sàng cho production.
 

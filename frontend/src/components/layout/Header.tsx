@@ -75,7 +75,7 @@ export function Header({ className = '' }: Readonly<HeaderProps>) {
           Logo luôn là Link về trang chủ. Đây là lối thoát duy nhất trên máy
           tính vì thanh điều hướng đáy chỉ hiện ở di động.
         */}
-        <Link to="/" aria-label="Tâm Đặng — trang chủ">
+        <Link to="/" aria-label="May An — trang chủ">
           <BrandLogo markSize={34} wordmarkClassName="hidden text-xl sm:inline" />
         </Link>
 

@@ -46,6 +46,7 @@ beforeEach(async () => {
   await prisma.cartItem.deleteMany();
   await prisma.cart.deleteMany();
   await prisma.refreshToken.deleteMany();
+  await prisma.userStaffPermission.deleteMany();
   await prisma.address.deleteMany();
   await prisma.productImage.deleteMany();
   await prisma.product.deleteMany();

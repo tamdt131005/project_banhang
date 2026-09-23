@@ -1,11 +1,14 @@
-import { Prisma, type Role, type StaffPermission, type User } from '@prisma/client';
+import { createHmac, randomInt, timingSafeEqual } from 'node:crypto';
+import { Prisma, type EmailOtpPurpose, type Role, type StaffPermission, type User } from '@prisma/client';
+import { env } from '../../config/env.js';
 import { deleteUploadedFile, storeAvatarImage } from '../../lib/image.js';
 import { createRefreshToken, hashRefreshToken, signAccessToken } from '../../lib/jwt.js';
 import { hashPassword, verifyPassword } from '../../lib/password.js';
 import { prisma } from '../../lib/prisma.js';
 import { AppError } from '../../middleware/error.js';
-import type { LoginInput, RegisterInput, UpdateProfileInput } from './auth.schema.js';
+import type { ChangePasswordInput, LoginInput, RegisterInput, UpdateProfileInput } from './auth.schema.js';
 import { listUserPermissions } from '../permissions/permission.service.js';
+import { sendEmailOtp } from './email-otp.mailer.js';
 
 export interface PublicUser {
   id: number;
@@ -49,19 +52,146 @@ async function issueTokens(user: User): Promise<IssuedTokens> {
   return { accessToken: signAccessToken(user), refreshToken: refresh.token };
 }
 
-export async function register(input: RegisterInput) {
-  let user: User;
+function otpDigest(email: string, purpose: EmailOtpPurpose, otp: string) {
+  return createHmac('sha256', env.EMAIL_OTP_HMAC_SECRET)
+    .update(`${purpose}\0${email}\0${otp}`)
+    .digest('hex');
+}
+
+function requireEmailOtpConfiguration() {
+  if (
+    env.EMAIL_OTP_HMAC_SECRET.length < 32 ||
+    !env.SMTP_HOST ||
+    !env.MAIL_FROM
+  ) {
+    throw new AppError(503, 'EMAIL_OTP_UNAVAILABLE', 'Chức năng gửi mã email hiện chưa sẵn sàng.');
+  }
+}
+
+async function deliverEmailOtp(
+  challengeId: number,
+  email: string,
+  otp: string,
+  purpose: EmailOtpPurpose,
+  digest: string,
+) {
   try {
-    user = await prisma.user.create({
-      data: {
-        email: input.email,
-        passwordHash: await hashPassword(input.password),
-        fullName: input.fullName,
-        phone: input.phone ?? null,
-        // Tạo sẵn giỏ hàng để phần còn lại của hệ thống luôn tìm thấy giỏ,
-        // khỏi phải xử lý trường hợp "user chưa có giỏ" ở mọi nơi.
-        cart: { create: {} },
-      },
+    await sendEmailOtp(email, otp, purpose);
+  } catch {
+    await prisma.emailOtpChallenge
+      .deleteMany({ where: { id: challengeId, otpDigest: digest } })
+      .catch(() => undefined);
+    console.error('[auth] email OTP delivery failed (details redacted)');
+  }
+}
+
+async function requestEmailOtp(email: string, purpose: EmailOtpPurpose) {
+  requireEmailOtpConfiguration();
+  const now = new Date();
+  await prisma.emailOtpChallenge.deleteMany({ where: { expiresAt: { lt: now } } });
+
+  const existingUser = await prisma.user.findUnique({
+    where: { email },
+    select: { id: true },
+  });
+  const eligible = purpose === 'REGISTER' ? !existingUser : Boolean(existingUser);
+  if (!eligible) return;
+
+  const current = await prisma.emailOtpChallenge.findUnique({
+    where: { email_purpose: { email, purpose } },
+  });
+  if (current && current.resendAvailableAt > now) return;
+
+  const otp = randomInt(1_000_000).toString().padStart(6, '0');
+  const digest = otpDigest(email, purpose, otp);
+  const expiresAt = new Date(now.getTime() + env.EMAIL_OTP_TTL_MINUTES * 60_000);
+  const resendAvailableAt = new Date(now.getTime() + env.EMAIL_OTP_RESEND_SECONDS * 1000);
+  const challenge = await prisma.emailOtpChallenge.upsert({
+    where: { email_purpose: { email, purpose } },
+    create: { email, purpose, otpDigest: digest, expiresAt, resendAvailableAt },
+    update: {
+      otpDigest: digest,
+      expiresAt,
+      resendAvailableAt,
+      failedAttemptCount: 0,
+    },
+  });
+
+  void deliverEmailOtp(challenge.id, email, otp, purpose, digest);
+}
+
+export function requestRegistrationOtp(email: string) {
+  return requestEmailOtp(email, 'REGISTER');
+}
+
+export function requestPasswordResetOtp(email: string) {
+  return requestEmailOtp(email, 'PASSWORD_RESET');
+}
+
+async function consumeEmailOtp(
+  tx: Prisma.TransactionClient,
+  email: string,
+  purpose: EmailOtpPurpose,
+  otp: string,
+) {
+  const challenge = await tx.emailOtpChallenge.findUnique({
+    where: { email_purpose: { email, purpose } },
+  });
+  if (!challenge) return false;
+
+  if (
+    challenge.expiresAt <= new Date() ||
+    challenge.failedAttemptCount >= env.EMAIL_OTP_MAX_ATTEMPTS
+  ) {
+    await tx.emailOtpChallenge.deleteMany({ where: { id: challenge.id } });
+    return false;
+  }
+
+  const expected = Buffer.from(challenge.otpDigest, 'hex');
+  const received = Buffer.from(otpDigest(email, purpose, otp), 'hex');
+  const valid = expected.length === received.length && timingSafeEqual(expected, received);
+  if (!valid) {
+    const incremented = await tx.emailOtpChallenge.updateMany({
+      where: { id: challenge.id, failedAttemptCount: challenge.failedAttemptCount },
+      data: { failedAttemptCount: { increment: 1 } },
+    });
+    if (incremented.count === 1 && challenge.failedAttemptCount + 1 >= env.EMAIL_OTP_MAX_ATTEMPTS) {
+      await tx.emailOtpChallenge.deleteMany({
+        where: { id: challenge.id, failedAttemptCount: { gte: env.EMAIL_OTP_MAX_ATTEMPTS } },
+      });
+    }
+    return false;
+  }
+
+  const consumed = await tx.emailOtpChallenge.deleteMany({
+    where: { id: challenge.id, otpDigest: challenge.otpDigest },
+  });
+  return consumed.count === 1;
+}
+
+const invalidOrExpiredOtp = () =>
+  AppError.badRequest('INVALID_OR_EXPIRED_OTP', 'Mã xác nhận không hợp lệ hoặc đã hết hạn.');
+
+export async function register(input: RegisterInput) {
+  requireEmailOtpConfiguration();
+  const passwordHash = await hashPassword(input.password);
+  let result: { kind: 'created'; user: User } | { kind: 'invalid' };
+  try {
+    result = await prisma.$transaction(async (tx) => {
+      const valid = await consumeEmailOtp(tx, input.email, 'REGISTER', input.otp);
+      if (!valid) return { kind: 'invalid' as const };
+
+      const user = await tx.user.create({
+        data: {
+          email: input.email,
+          passwordHash,
+          fullName: input.fullName,
+          phone: input.phone ?? null,
+          // Tạo sẵn giỏ hàng để phần còn lại của hệ thống luôn tìm thấy giỏ.
+          cart: { create: {} },
+        },
+      });
+      return { kind: 'created' as const, user };
     });
   } catch (error) {
     // Dựa vào ràng buộc unique thay vì kiểm tra trước rồi mới ghi: cách này
@@ -72,10 +202,37 @@ export async function register(input: RegisterInput) {
     throw error;
   }
 
-  return { user: await toPublicUser(user), tokens: await issueTokens(user) };
+  if (result.kind === 'invalid') throw invalidOrExpiredOtp();
+  return { user: await toPublicUser(result.user), tokens: await issueTokens(result.user) };
 }
 
-export async function login(input: LoginInput) {
+export async function resetPassword(input: { email: string; otp: string; newPassword: string }) {
+  requireEmailOtpConfiguration();
+  const passwordHash = await hashPassword(input.newPassword);
+  const changed = await prisma.$transaction(async (tx) => {
+    const valid = await consumeEmailOtp(tx, input.email, 'PASSWORD_RESET', input.otp);
+    if (!valid) return false;
+
+    const user = await tx.user.findUnique({
+      where: { email: input.email },
+      select: { id: true },
+    });
+    if (!user) return false;
+
+    await tx.user.update({
+      where: { id: user.id },
+      data: { passwordHash },
+    });
+    await tx.refreshToken.updateMany({
+      where: { userId: user.id, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+    return true;
+  });
+  if (!changed) throw invalidOrExpiredOtp();
+}
+
+async function authenticate(input: LoginInput) {
   const user = await prisma.user.findUnique({ where: { email: input.email } });
   const passwordMatches = user ? await verifyPassword(input.password, user.passwordHash) : false;
 
@@ -86,6 +243,37 @@ export async function login(input: LoginInput) {
   }
 
   return { user: await toPublicUser(user), tokens: await issueTokens(user) };
+}
+
+export function login(input: LoginInput) {
+  return authenticate(input);
+}
+
+export async function changePassword(userId: number, input: ChangePasswordInput) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { role: true, passwordHash: true },
+  });
+  if (!user) throw AppError.unauthorized();
+  if (user.role === 'USER') throw AppError.forbidden('Chức năng này dành cho tài khoản nhân viên.');
+  if (!(await verifyPassword(input.currentPassword, user.passwordHash))) {
+    throw AppError.badRequest('INVALID_CURRENT_PASSWORD', 'Mật khẩu hiện tại không đúng.');
+  }
+
+  const newHash = await hashPassword(input.newPassword);
+  await prisma.$transaction(async (tx) => {
+    const updated = await tx.user.updateMany({
+      where: { id: userId, passwordHash: user.passwordHash },
+      data: { passwordHash: newHash },
+    });
+    if (updated.count !== 1) {
+      throw AppError.conflict('PASSWORD_CHANGED', 'Mật khẩu đã thay đổi. Vui lòng đăng nhập lại.');
+    }
+    await tx.refreshToken.updateMany({
+      where: { userId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+  });
 }
 
 export async function refresh(rawToken: string) {

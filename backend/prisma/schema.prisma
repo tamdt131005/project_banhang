@@ -21,6 +21,11 @@ enum Role {
   ADMIN
 }
 
+enum EmailOtpPurpose {
+  REGISTER
+  PASSWORD_RESET
+}
+
 enum StaffPermission {
   DASHBOARD
   ORDERS
@@ -149,6 +154,24 @@ model UserStaffPermission {
   @@unique([userId, permission])
   @@index([grantedById])
   @@map("user_staff_permissions")
+}
+
+/// Store only an HMAC digest of one-time email codes; no user relation because
+/// registration challenges exist before the account row is created.
+model EmailOtpChallenge {
+  id                 Int            @id @default(autoincrement())
+  email              String         @db.VarChar(191)
+  purpose            EmailOtpPurpose
+  otpDigest          String         @db.VarChar(64)
+  expiresAt          DateTime
+  failedAttemptCount Int            @default(0)
+  resendAvailableAt  DateTime
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  @@unique([email, purpose])
+  @@index([expiresAt])
+  @@map("email_otp_challenges")
 }
 
 model Address {

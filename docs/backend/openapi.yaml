@@ -1,6 +1,6 @@
 openapi: 3.1.0
 info:
-  title: Tâm Đặng Admin API
+  title: May An Admin API
   version: 0.6.0
   description: Source-of-truth transport contract including SPEC-BANNER-001 v0.4.
 servers:
@@ -383,7 +383,7 @@ components:
       required: [id, role, permissions]
       properties:
         id: { type: integer }
-        role: { type: string, enum: [USER, STAFF] }
+        role: { type: string, enum: [STAFF] }
         permissions: { type: array, items: { $ref: '#/components/schemas/StaffPermission' } }
     AdminUser:
       type: object
@@ -749,6 +749,24 @@ paths:
       operationId: listAdminUsers
       parameters: [{ name: search, in: query, schema: { type: string } }, { name: role, in: query, schema: { $ref: '#/components/schemas/Role' } }, { name: sort, in: query, schema: { type: string, enum: [newest, orders-desc, name] } }, { name: page, in: query, schema: { type: integer } }, { name: limit, in: query, schema: { type: integer } }]
       responses: { '200': { description: User page, content: { application/json: { schema: { type: object, required: [items, pagination], properties: { items: { type: array, items: { $ref: '#/components/schemas/AdminUser' } }, pagination: { $ref: '#/components/schemas/Pagination' } } } } } } }
+  /admin/users/staff:
+    post:
+      operationId: createAdminStaff
+      description: Only the shop owner can create staff accounts. Customer accounts cannot be converted to staff.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password, fullName, permissions]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, minLength: 8, maxLength: 72 }
+                fullName: { type: string }
+                phone: { type: string }
+                permissions: { type: array, minItems: 1, items: { $ref: '#/components/schemas/StaffPermission' } }
+      responses: { '201': { description: Staff created, content: { application/json: { schema: { type: object, required: [user], properties: { user: { $ref: '#/components/schemas/AdminUser' } } } } } } }
   /admin/users/{id}:
     get:
       operationId: getAdminUser
@@ -762,7 +780,7 @@ paths:
     patch:
       operationId: updateAdminUserAccess
       parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
-      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [role, permissions], properties: { role: { type: string, enum: [USER, STAFF] }, permissions: { type: array, items: { $ref: '#/components/schemas/StaffPermission' } } } } } } }
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [permissions], properties: { permissions: { type: array, minItems: 1, items: { $ref: '#/components/schemas/StaffPermission' } } } } } } }
       responses: { '200': { description: Staff access updated, content: { application/json: { schema: { type: object, required: [access], properties: { access: { $ref: '#/components/schemas/UserStaffAccess' } } } } } } }
   /admin/users/{id}/role:
     patch:

@@ -74,6 +74,7 @@ const adminPaths = {
   paymentStatus: '/admin/orders/{id}/payment-status',
   users: '/admin/users',
   user: '/admin/users/{id}',
+  staff: '/admin/users/staff',
   userRole: '/admin/users/{id}/role',
   userAccess: '/admin/users/{id}/access',
   revokeSessions: '/admin/users/{id}/revoke-sessions',
@@ -190,6 +191,14 @@ export interface AdminUser {
   role: 'USER' | 'STAFF' | 'ADMIN';
   createdAt: string;
   _count: { orders: number; addresses: number };
+}
+
+export interface CreateStaffInput {
+  email: string;
+  password: string;
+  fullName: string;
+  phone?: string;
+  permissions: AdminPermission[];
 }
 
 export interface AdminUserDetail extends AdminUser {
@@ -487,6 +496,12 @@ const adminApi = {
     return api.get<JsonResponse<'/admin/users', 'get', 200>>(`/api${adminPaths.users}`, contractQuery);
   },
 
+  createStaff: (input: CreateStaffInput) =>
+    api.post<JsonResponse<'/admin/users/staff', 'post', 201>>(
+      `/api${adminPaths.staff}`,
+      input satisfies JsonRequestBody<'/admin/users/staff', 'post'>,
+    ),
+
   user: (id: number) => api.get<JsonResponse<'/admin/users/{id}', 'get', 200>>(`/api${bindPath(adminPaths.user, id)}`),
 
   setUserRole: (id: number, role: 'USER' | 'ADMIN') => {
@@ -499,7 +514,7 @@ const adminApi = {
       `/api${bindPath(adminPaths.userAccess, id)}`,
     ),
 
-  setUserAccess: (id: number, input: { role: 'USER' | 'STAFF'; permissions: AdminPermission[] }) => {
+  setUserAccess: (id: number, input: { permissions: AdminPermission[] }) => {
     const body = input satisfies JsonRequestBody<'/admin/users/{id}/access', 'patch'>;
     return api.patch<JsonResponse<'/admin/users/{id}/access', 'patch', 200>>(
       `/api${bindPath(adminPaths.userAccess, id)}`,
@@ -587,10 +602,11 @@ interface AdminGateway {
   };
   users: {
     list(query?: UserListQuery): Promise<ApiPaged<AdminUser>>;
+    createStaff(input: CreateStaffInput): Promise<JsonResponse<'/admin/users/staff', 'post', 201>>;
     detail(id: number): Promise<{ user: AdminUserDetail }>;
     setRole(id: number, role: 'USER' | 'ADMIN'): Promise<{ user: AdminUser }>;
     access(id: number): Promise<JsonResponse<'/admin/users/{id}/access', 'get', 200>>;
-    setAccess(id: number, input: { role: 'USER' | 'STAFF'; permissions: AdminPermission[] }): Promise<JsonResponse<'/admin/users/{id}/access', 'patch', 200>>;
+    setAccess(id: number, input: { permissions: AdminPermission[] }): Promise<JsonResponse<'/admin/users/{id}/access', 'patch', 200>>;
     revokeSessions(id: number): Promise<{ revoked: number }>;
   };
   chat: {
@@ -618,7 +634,7 @@ export const adminGateway: AdminGateway = {
   categories: { list: adminApi.categories, create: adminApi.createCategory, update: adminApi.updateCategory, remove: adminApi.removeCategory },
   banners: { list: adminApi.banners, create: adminApi.createBanner, update: adminApi.updateBanner, setActive: adminApi.setBannerActive, replaceImage: adminApi.replaceBannerImage },
   orders: { list: adminApi.orders, detail: adminApi.order, setStatus: adminApi.setOrderStatus, setPaymentStatus: adminApi.setPaymentStatus },
-  users: { list: adminApi.users, detail: adminApi.user, setRole: adminApi.setUserRole, access: adminApi.userAccess, setAccess: adminApi.setUserAccess, revokeSessions: adminApi.revokeSessions },
+  users: { list: adminApi.users, createStaff: adminApi.createStaff, detail: adminApi.user, setRole: adminApi.setUserRole, access: adminApi.userAccess, setAccess: adminApi.setUserAccess, revokeSessions: adminApi.revokeSessions },
   chat: {
     list: adminApi.chatConversations,
     detail: adminApi.chatConversation,

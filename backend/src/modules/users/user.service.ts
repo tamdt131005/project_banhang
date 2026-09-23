@@ -1,7 +1,8 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma.js';
 import { AppError } from '../../middleware/error.js';
-import type { StaffAccessInput, RoleUpdateInput, UserListQuery } from './user.schema.js';
+import { hashPassword } from '../../lib/password.js';
+import type { StaffAccessInput, StaffCreateInput, RoleUpdateInput, UserListQuery } from './user.schema.js';
 import { getStaffAccess as readStaffAccess } from '../permissions/permission.service.js';
 
 /** Không bao giờ chọn passwordHash — nó không được rời khỏi tầng dữ liệu. */
@@ -153,10 +154,38 @@ export async function updateUserRole(
 export async function getStaffAccess(userId: number) {
   const access = await readStaffAccess(userId);
   if (!access) throw AppError.notFound('Không tìm thấy tài khoản này.');
-  if (access.role === 'ADMIN') {
-    throw AppError.conflict('ADMIN_ACCESS_LOCKED', 'Không thể chỉnh quyền của quản trị viên cấp cao.');
+  if (access.role !== 'STAFF') {
+    throw AppError.conflict('NOT_STAFF', 'Chỉ tài khoản nhân viên mới có thể chỉnh quyền tại đây.');
   }
   return access;
+}
+
+export async function createStaff(actorId: number, input: StaffCreateInput) {
+  const passwordHash = await hashPassword(input.password);
+  try {
+    return await prisma.user.create({
+      data: {
+        email: input.email,
+        passwordHash,
+        fullName: input.fullName,
+        phone: input.phone ?? null,
+        role: 'STAFF',
+        cart: { create: {} },
+        staffPermissions: {
+          create: input.permissions.map((permission) => ({
+            permission,
+            grantedBy: { connect: { id: actorId } },
+          })),
+        },
+      },
+      select: listSelect,
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      throw AppError.conflict('EMAIL_TAKEN', 'Email này đã được sử dụng.');
+    }
+    throw error;
+  }
 }
 
 export async function updateStaffAccess(
@@ -169,25 +198,22 @@ export async function updateStaffAccess(
     select: { id: true, role: true },
   });
   if (!target) throw AppError.notFound('Không tìm thấy tài khoản này.');
-  if (target.role === 'ADMIN') {
-    throw AppError.conflict('ADMIN_ACCESS_LOCKED', 'Không thể chỉnh quyền của quản trị viên cấp cao.');
+  if (target.role !== 'STAFF') {
+    throw AppError.conflict('NOT_STAFF', 'Không thể biến tài khoản khách thành nhân viên.');
   }
   if (targetId === actorId) {
     throw AppError.badRequest('CANNOT_EDIT_SELF', 'Không thể tự chỉnh quyền của chính mình.');
   }
 
   const result = await prisma.$transaction(async (tx) => {
-    await tx.user.update({ where: { id: targetId }, data: { role: input.role } });
     await tx.userStaffPermission.deleteMany({ where: { userId: targetId } });
-    if (input.role === 'STAFF') {
-      await tx.userStaffPermission.createMany({
-        data: input.permissions.map((permission) => ({
-          userId: targetId,
-          permission,
-          grantedById: actorId,
-        })),
-      });
-    }
+    await tx.userStaffPermission.createMany({
+      data: input.permissions.map((permission) => ({
+        userId: targetId,
+        permission,
+        grantedById: actorId,
+      })),
+    });
     await tx.refreshToken.updateMany({
       where: { userId: targetId, revokedAt: null },
       data: { revokedAt: new Date() },

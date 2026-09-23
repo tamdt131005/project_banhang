@@ -1,4 +1,4 @@
-import { type FormEvent, useState } from 'react';
+import { type FormEvent, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AuthShell } from '../../components/auth/AuthShell';
 import { Button } from '../../components/ui/Button';
@@ -8,16 +8,25 @@ import { useAuth } from '../../context/AuthContext';
 import { errorMessage, fieldErrors } from '../../lib/errors';
 
 /** Trang định tuyến không nhận prop; dữ liệu lấy từ URL và API. */
-export interface RegisterPageProps {}
-
-export function RegisterPage({}: Readonly<RegisterPageProps>) {
-  const { register } = useAuth();
+export function RegisterPage() {
+  const { requestRegistrationOtp, register } = useAuth();
   const navigate = useNavigate();
 
   const [form, setForm] = useState({ fullName: '', email: '', phone: '', password: '' });
+  const [otp, setOtp] = useState('');
+  const [otpSent, setOtpSent] = useState(false);
+  const [requestBusy, setRequestBusy] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
   const [message, setMessage] = useState<string | null>(null);
+  const [messageTone, setMessageTone] = useState<'error' | 'success'>('error');
   const [fields, setFields] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (cooldown <= 0) return undefined;
+    const timer = window.setTimeout(() => setCooldown((value) => value - 1), 1000);
+    return () => window.clearTimeout(timer);
+  }, [cooldown]);
 
   function update(key: keyof typeof form) {
     return (event: { target: { value: string } }) => {
@@ -25,8 +34,33 @@ export function RegisterPage({}: Readonly<RegisterPageProps>) {
     };
   }
 
+  async function requestOtp() {
+    setRequestBusy(true);
+    setMessage(null);
+    setFields({});
+    try {
+      const result = await requestRegistrationOtp(form.email);
+      setOtpSent(true);
+      setOtp('');
+      setCooldown(result.retryAfterSeconds);
+      setMessage(result.message);
+      setMessageTone('success');
+    } catch (error) {
+      setMessage(errorMessage(error));
+      setFields(fieldErrors(error));
+      setMessageTone('error');
+    } finally {
+      setRequestBusy(false);
+    }
+  }
+
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
+    if (!otpSent) {
+      setMessage('Hãy gửi mã xác nhận đến email trước.');
+      setMessageTone('error');
+      return;
+    }
     setBusy(true);
     setMessage(null);
     setFields({});
@@ -35,6 +69,7 @@ export function RegisterPage({}: Readonly<RegisterPageProps>) {
       await register({
         fullName: form.fullName,
         email: form.email,
+        otp,
         password: form.password,
         // Số điện thoại không bắt buộc — gửi chuỗi rỗng sẽ trượt regex ở backend.
         ...(form.phone.trim() ? { phone: form.phone.trim() } : {}),
@@ -43,6 +78,7 @@ export function RegisterPage({}: Readonly<RegisterPageProps>) {
     } catch (error) {
       setMessage(errorMessage(error));
       setFields(fieldErrors(error));
+      setMessageTone('error');
     } finally {
       setBusy(false);
     }
@@ -55,7 +91,7 @@ export function RegisterPage({}: Readonly<RegisterPageProps>) {
       imageSeed="tamdang-dang-ky"
     >
       <form onSubmit={handleSubmit} className="space-y-4">
-        {message ? <Alert>{message}</Alert> : null}
+        {message ? <Alert tone={messageTone}>{message}</Alert> : null}
 
         <TextField
           label="Họ và tên"
@@ -73,8 +109,36 @@ export function RegisterPage({}: Readonly<RegisterPageProps>) {
           autoComplete="email"
           value={form.email}
           error={fields['email']}
-          onChange={update('email')}
+          onChange={(event) => {
+            setForm((previous) => ({ ...previous, email: event.target.value }));
+            setOtpSent(false);
+            setOtp('');
+            setCooldown(0);
+          }}
         />
+
+        <Button
+          variant="secondary"
+          className="w-full"
+          loading={requestBusy}
+          disabled={requestBusy || cooldown > 0 || !form.email.trim()}
+          onClick={() => void requestOtp()}
+        >
+          {cooldown > 0 ? `Gửi lại mã sau ${cooldown}s` : otpSent ? 'Gửi lại mã xác nhận' : 'Gửi mã xác nhận'}
+        </Button>
+
+        {otpSent ? (
+          <TextField
+            label="Mã xác nhận email"
+            required
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            maxLength={6}
+            value={otp}
+            error={fields['otp']}
+            onChange={(event) => setOtp(event.target.value.replace(/\D/g, '').slice(0, 6))}
+          />
+        ) : null}
 
         <TextField
           label="Số điện thoại"

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { requireAdmin, requireAuth, requirePermission } from '../../middleware/auth.js';
 import {
   detailHandler,
+  createStaffHandler,
   listHandler,
   revokeSessionsHandler,
   staffAccessHandler,
@@ -14,6 +15,7 @@ export const adminUserRouter = Router();
 adminUserRouter.use(requireAuth);
 
 adminUserRouter.get('/', requirePermission('CUSTOMERS'), listHandler);
+adminUserRouter.post('/staff', requireAdmin, createStaffHandler);
 adminUserRouter.get('/:id', requirePermission('CUSTOMERS'), detailHandler);
 adminUserRouter.get('/:id/access', requireAdmin, staffAccessHandler);
 adminUserRouter.patch('/:id/access', requireAdmin, updateStaffAccessHandler);
