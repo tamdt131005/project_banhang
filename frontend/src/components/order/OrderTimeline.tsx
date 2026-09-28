@@ -144,10 +144,10 @@ export function OrderTimeline({ status, statusHistory }: Readonly<OrderTimelineP
               <div className="min-w-0 pt-0.5">
                 <p className="text-sm font-medium">{eventTitle(event)}</p>
                 <p className="mt-0.5 text-xs text-ink-muted">{eventTime(event)}</p>
-                <p className="mt-0.5 text-xs text-ink-muted">
-                  {ACTOR_LABEL[event.actorType]}
-                  {event.reason ? ` · ${event.reason}` : ''}
-                </p>
+                <p className="mt-0.5 text-xs text-ink-muted">{ACTOR_LABEL[event.actorType]}</p>
+                {event.reason ? (
+                  <p className="mt-0.5 text-xs text-ink-muted">Lý do: {event.reason}</p>
+                ) : null}
               </div>
             </li>
           );

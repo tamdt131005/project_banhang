@@ -1,7 +1,14 @@
 import type { RequestHandler } from 'express';
 import { idParamSchema } from '../../lib/validators.js';
 import { AppError } from '../../middleware/error.js';
-import { roleUpdateSchema, staffAccessSchema, staffCreateSchema, userListQuerySchema } from './user.schema.js';
+import {
+  roleUpdateSchema,
+  staffAccessSchema,
+  staffCreateSchema,
+  staffPasswordResetSchema,
+  staffProfileSchema,
+  userListQuerySchema,
+} from './user.schema.js';
 import * as userService from './user.service.js';
 
 export const listHandler: RequestHandler = async (req, res) => {
@@ -47,6 +54,20 @@ export const updateStaffAccessHandler: RequestHandler = async (req, res) => {
   const input = staffAccessSchema.parse(req.body);
   const access = await userService.updateStaffAccess(req.user!.id, id, input);
   res.json({ access });
+};
+
+export const updateStaffProfileHandler: RequestHandler = async (req, res) => {
+  const { id } = idParamSchema.parse(req.params);
+  const input = staffProfileSchema.parse(req.body);
+  const user = await userService.updateStaffProfile(req.user!.id, id, input);
+  res.json({ user });
+};
+
+export const resetStaffPasswordHandler: RequestHandler = async (req, res) => {
+  const { id } = idParamSchema.parse(req.params);
+  const input = staffPasswordResetSchema.parse(req.body);
+  await userService.resetStaffPassword(req.user!.id, id, input);
+  res.json({ reset: true });
 };
 
 export const revokeSessionsHandler: RequestHandler = async (req, res) => {

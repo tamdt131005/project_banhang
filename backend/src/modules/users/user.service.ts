@@ -2,7 +2,14 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma.js';
 import { AppError } from '../../middleware/error.js';
 import { hashPassword } from '../../lib/password.js';
-import type { StaffAccessInput, StaffCreateInput, RoleUpdateInput, UserListQuery } from './user.schema.js';
+import type {
+  StaffAccessInput,
+  StaffCreateInput,
+  StaffPasswordResetInput,
+  StaffProfileInput,
+  RoleUpdateInput,
+  UserListQuery,
+} from './user.schema.js';
 import { getStaffAccess as readStaffAccess } from '../permissions/permission.service.js';
 
 /** Không bao giờ chọn passwordHash — nó không được rời khỏi tầng dữ liệu. */
@@ -229,6 +236,62 @@ export async function updateStaffAccess(
     role: result.role,
     permissions: result.staffPermissions.map((item) => item.permission),
   };
+}
+
+async function requireOtherStaff(actorId: number, targetId: number) {
+  if (targetId === actorId) {
+    throw AppError.badRequest('CANNOT_EDIT_SELF', 'Không thể tự sửa tài khoản quản trị bằng chức năng nhân viên.');
+  }
+  const target = await prisma.user.findUnique({
+    where: { id: targetId },
+    select: { id: true, role: true, email: true },
+  });
+  if (!target) throw AppError.notFound('Không tìm thấy tài khoản này.');
+  if (target.role !== 'STAFF') {
+    throw AppError.conflict('NOT_STAFF', 'Chỉ tài khoản nhân viên mới được cập nhật tại đây.');
+  }
+  return target;
+}
+
+export async function updateStaffProfile(actorId: number, targetId: number, input: StaffProfileInput) {
+  const target = await requireOtherStaff(actorId, targetId);
+  try {
+    return await prisma.$transaction(async (tx) => {
+      const user = await tx.user.update({
+        where: { id: targetId },
+        data: { fullName: input.fullName, email: input.email, phone: input.phone },
+        select: listSelect,
+      });
+      if (target.email !== input.email) {
+        await tx.refreshToken.updateMany({
+          where: { userId: targetId, revokedAt: null },
+          data: { revokedAt: new Date() },
+        });
+      }
+      return user;
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      throw AppError.conflict('EMAIL_TAKEN', 'Email này đã được sử dụng.');
+    }
+    throw error;
+  }
+}
+
+export async function resetStaffPassword(
+  actorId: number,
+  targetId: number,
+  input: StaffPasswordResetInput,
+) {
+  await requireOtherStaff(actorId, targetId);
+  const passwordHash = await hashPassword(input.password);
+  await prisma.$transaction(async (tx) => {
+    await tx.user.update({ where: { id: targetId }, data: { passwordHash } });
+    await tx.refreshToken.updateMany({
+      where: { userId: targetId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+  });
 }
 
 /** Buộc đăng xuất mọi thiết bị của một tài khoản (nghi bị lộ mật khẩu). */

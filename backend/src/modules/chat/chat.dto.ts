@@ -1,4 +1,12 @@
 import { Prisma } from '@prisma/client';
+import { STAFF_NOTE_PREFIX } from './chat.constants.js';
+
+/** Ghi chú nội bộ không được xuất hiện trong lịch sử khách hàng nhìn thấy. */
+export const customerVisibleMessageWhere = {
+  NOT: {
+    AND: [{ senderType: 'SYSTEM' }, { content: { startsWith: STAFF_NOTE_PREFIX } }],
+  },
+} satisfies Prisma.ChatMessageWhereInput;
 
 export const conversationPublicSelect = {
   id: true,
@@ -24,6 +32,7 @@ export const customerConversationItemSelect = {
   ...conversationPublicSelect,
   assignedAdmin: { select: { id: true, email: true, fullName: true } },
   messages: {
+    where: customerVisibleMessageWhere,
     take: 1,
     orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     select: {

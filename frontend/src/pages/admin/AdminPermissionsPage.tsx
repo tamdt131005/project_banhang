@@ -9,6 +9,7 @@ import { TextField } from '../../components/ui/Field';
 import { Pagination } from '../../components/ui/Pagination';
 import { CheckIcon, SearchIcon, ShieldIcon, UserIcon } from '../../components/ui/icons';
 import { errorMessage } from '../../lib/errors';
+import { formatDateTime } from '../../lib/format';
 import type { AdminPermission } from '../../types/api';
 
 const PERMISSION_OPTIONS: { key: AdminPermission; label: string; description: string }[] = [
@@ -40,6 +41,12 @@ export function AdminPermissionsPage({}: Readonly<AdminPermissionsPageProps>) {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [newPermissions, setNewPermissions] = useState<AdminPermission[]>([]);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [nextPassword, setNextPassword] = useState('');
+  const [confirmNextPassword, setConfirmNextPassword] = useState('');
+  const [profileError, setProfileError] = useState<string | null>(null);
 
   useEffect(() => setKeyword(search), [search]);
 
@@ -82,6 +89,16 @@ export function AdminPermissionsPage({}: Readonly<AdminPermissionsPageProps>) {
     setPermissions(access.data.permissions);
   }, [access.data]);
 
+  useEffect(() => {
+    if (!selectedUser) return;
+    setFullName(selectedUser.fullName);
+    setEmail(selectedUser.email);
+    setPhone(selectedUser.phone ?? '');
+    setNextPassword('');
+    setConfirmNextPassword('');
+    setProfileError(null);
+  }, [selectedUser?.id, selectedUser?.fullName, selectedUser?.email, selectedUser?.phone]);
+
   const save = useMutation({
     mutationFn: () =>
       adminGateway.users.setAccess(selectedId, {
@@ -93,6 +110,29 @@ export function AdminPermissionsPage({}: Readonly<AdminPermissionsPageProps>) {
         queryClient.invalidateQueries({ queryKey: ['admin', 'users'] }),
         queryClient.invalidateQueries({ queryKey: ['admin', 'user-access', selectedId] }),
       ]);
+    },
+  });
+
+  const updateProfile = useMutation({
+    mutationFn: () =>
+      adminGateway.users.updateProfile(selectedId, {
+        fullName: fullName.trim(),
+        email: email.trim(),
+        phone: phone.trim() ? phone.trim() : null,
+      }),
+    onSuccess: async ({ user }) => {
+      setNotice(`Đã cập nhật thông tin ${user.fullName}.`);
+      await queryClient.invalidateQueries({ queryKey: ['admin', 'users'] });
+    },
+  });
+
+  const resetPassword = useMutation({
+    mutationFn: () => adminGateway.users.resetPassword(selectedId, nextPassword),
+    onSuccess: async () => {
+      setNextPassword('');
+      setConfirmNextPassword('');
+      setNotice('Đã đặt lại mật khẩu. Nhân viên cần đăng nhập lại.');
+      await queryClient.invalidateQueries({ queryKey: ['admin', 'users'] });
     },
   });
 
@@ -130,6 +170,24 @@ export function AdminPermissionsPage({}: Readonly<AdminPermissionsPageProps>) {
       return;
     }
     create.mutate();
+  }
+
+  function submitProfile(event: FormEvent) {
+    event.preventDefault();
+    setProfileError(null);
+    setNotice(null);
+    updateProfile.mutate();
+  }
+
+  function submitReset(event: FormEvent) {
+    event.preventDefault();
+    setProfileError(null);
+    setNotice(null);
+    if (nextPassword !== confirmNextPassword) {
+      setProfileError('Mật khẩu xác nhận chưa khớp.');
+      return;
+    }
+    resetPassword.mutate();
   }
 
   function submitSearch(event: FormEvent) {
@@ -175,6 +233,8 @@ export function AdminPermissionsPage({}: Readonly<AdminPermissionsPageProps>) {
       </div>
 
       {save.isError ? <Alert>{errorMessage(save.error)}</Alert> : null}
+      {updateProfile.isError ? <Alert>{errorMessage(updateProfile.error)}</Alert> : null}
+      {resetPassword.isError ? <Alert>{errorMessage(resetPassword.error)}</Alert> : null}
       {notice ? <Alert tone="success">{notice}</Alert> : null}
 
       {showCreate ? (
@@ -233,7 +293,7 @@ export function AdminPermissionsPage({}: Readonly<AdminPermissionsPageProps>) {
                 type="search"
                 value={keyword}
                 onChange={(event) => setKeyword(event.target.value)}
-                placeholder="Tìm theo tên hoặc email…"
+                placeholder="Tìm theo tên, email hoặc số điện thoại"
                 className="h-9 w-full rounded-control border border-line bg-sunken pr-3 pl-9 text-sm outline-none focus:border-accent"
               />
             </form>
@@ -287,7 +347,7 @@ export function AdminPermissionsPage({}: Readonly<AdminPermissionsPageProps>) {
 
         <section className="min-w-0 rounded-card border border-line bg-surface p-4 shadow-xs sm:p-5">
           {!selectedUser ? (
-            <EmptyState title="Chọn nhân viên" description="Chọn một tài khoản nhân viên để chỉnh quyền." icon={<UserIcon className="size-6" />} />
+            <EmptyState title="Chọn nhân viên" description="Chọn một tài khoản để xem chi tiết, cập nhật và phân quyền." icon={<UserIcon className="size-6" />} />
           ) : access.isPending ? (
             <Skeleton className="h-96" />
           ) : access.isError ? (
@@ -297,10 +357,34 @@ export function AdminPermissionsPage({}: Readonly<AdminPermissionsPageProps>) {
               <div className="flex items-center gap-3">
                 <Avatar name={selectedUser.fullName} src={selectedUser.avatarUrl} size="md" />
                 <div className="min-w-0">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-ink-muted">Chi tiết nhân viên</p>
                   <h2 className="truncate font-semibold">{selectedUser.fullName}</h2>
                   <p className="truncate text-sm text-ink-muted">{selectedUser.email}</p>
+                  <p className="text-sm text-ink-muted">{selectedUser.phone || 'Chưa có số điện thoại'}</p>
+                  <p className="text-xs text-ink-muted">Tạo lúc {formatDateTime(selectedUser.createdAt)}</p>
                 </div>
               </div>
+
+              {profileError ? <Alert>{profileError}</Alert> : null}
+
+              <form onSubmit={submitProfile} className="space-y-3">
+                <h3 className="text-sm font-semibold">Cập nhật thông tin</h3>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <TextField label="Họ và tên" required value={fullName} onChange={(event) => setFullName(event.target.value)} />
+                  <TextField label="Email đăng nhập" type="email" required value={email} onChange={(event) => setEmail(event.target.value)} />
+                  <TextField label="Số điện thoại" inputMode="numeric" value={phone} onChange={(event) => setPhone(event.target.value)} />
+                </div>
+                <Button type="submit" variant="secondary" loading={updateProfile.isPending}>Lưu thông tin</Button>
+              </form>
+
+              <form onSubmit={submitReset} className="space-y-3 border-t border-line pt-4">
+                <h3 className="text-sm font-semibold">Đặt lại mật khẩu</h3>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <TextField label="Mật khẩu mới" type="password" required minLength={8} autoComplete="new-password" value={nextPassword} onChange={(event) => setNextPassword(event.target.value)} />
+                  <TextField label="Nhập lại mật khẩu" type="password" required autoComplete="new-password" value={confirmNextPassword} onChange={(event) => setConfirmNextPassword(event.target.value)} />
+                </div>
+                <Button type="submit" variant="secondary" disabled={!nextPassword} loading={resetPassword.isPending}>Đặt lại mật khẩu</Button>
+              </form>
 
               <fieldset className="space-y-2">
                 <legend className="mb-2 text-sm font-semibold">Các mục được phép truy cập</legend>

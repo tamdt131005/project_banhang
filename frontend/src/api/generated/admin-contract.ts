@@ -164,6 +164,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/chat/conversations/{id}/category": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["classifyAdminChatConversation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/chat/conversations/{id}/notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["addAdminChatNote"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/chat/conversations/{id}/transfer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["transferAdminChatConversation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/chat/agents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listAdminChatAgents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/stats": {
         parameters: {
             query?: never;
@@ -549,6 +613,38 @@ export interface paths {
         patch: operations["updateAdminUserRole"];
         trace?: never;
     };
+    "/admin/users/{id}/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["updateAdminStaffProfile"];
+        trace?: never;
+    };
+    "/admin/users/{id}/reset-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["resetAdminStaffPassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/users/{id}/revoke-sessions": {
         parameters: {
             query?: never;
@@ -571,6 +667,8 @@ export interface components {
     schemas: {
         /** @enum {string} */
         OrderStatus: "PENDING" | "CONFIRMED" | "SHIPPING" | "DELIVERED" | "CANCELLED";
+        /** @enum {string} */
+        AdminCancelReasonCode: "CUSTOMER_REQUEST" | "OUT_OF_STOCK" | "UNREACHABLE" | "INVALID_ADDRESS" | "PAYMENT_ISSUE" | "OTHER";
         /** @enum {string} */
         PaymentStatus: "UNPAID" | "PAID" | "FAILED";
         /** @enum {string} */
@@ -612,6 +710,44 @@ export interface components {
         AdminConversation: components["schemas"]["Conversation"] & {
             user: components["schemas"]["ConversationParticipant"];
             assignedAdmin: components["schemas"]["ConversationParticipant"] | null;
+        };
+        /** @enum {string} */
+        SupportCategory: "DON_HANG" | "SAN_PHAM" | "GIAO_HANG" | "THANH_TOAN" | "DOI_TRA" | "TAI_KHOAN" | "KHAC";
+        SupportClassification: {
+            category: components["schemas"]["SupportCategory"];
+            label: string;
+        };
+        SupportNote: {
+            id: number;
+            content: string;
+            /** Format: date-time */
+            createdAt: string;
+            author: components["schemas"]["ConversationParticipant"] | null;
+        };
+        SupportCustomerAddress: {
+            fullName: string;
+            phone: string;
+            line1: string;
+            ward: string;
+            district: string;
+            province: string;
+        };
+        SupportCustomerOrder: {
+            id: number;
+            code: string;
+            status: components["schemas"]["OrderStatus"];
+            total: number;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        SupportCustomer: {
+            id: number;
+            /** Format: email */
+            email: string;
+            fullName: string;
+            phone: string | null;
+            address: components["schemas"]["SupportCustomerAddress"] | null;
+            orders: components["schemas"]["SupportCustomerOrder"][];
         };
         CustomerConversationItem: components["schemas"]["Conversation"] & {
             assignedAdmin: components["schemas"]["ConversationParticipant"] | null;
@@ -1185,6 +1321,7 @@ export interface operations {
         parameters: {
             query?: {
                 status?: components["schemas"]["ConversationStatus"];
+                q?: string;
                 page?: number;
                 limit?: number;
             };
@@ -1222,7 +1359,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Conversation detail and message page */
+            /** @description Conversation detail */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -1231,6 +1368,9 @@ export interface operations {
                     "application/json": {
                         conversation: components["schemas"]["AdminConversation"];
                         messages: components["schemas"]["ChatMessage"][];
+                        notes: components["schemas"]["SupportNote"][];
+                        classification: components["schemas"]["SupportClassification"] | null;
+                        customer: components["schemas"]["SupportCustomer"];
                         pagination: components["schemas"]["Pagination"];
                     };
                 };
@@ -1302,7 +1442,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Conversation closed or idempotently replayed */
+            /** @description Conversation marked processed or idempotently replayed */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -1311,6 +1451,121 @@ export interface operations {
                     "application/json": {
                         conversation: components["schemas"]["Conversation"];
                         message: components["schemas"]["ChatMessage"];
+                    };
+                };
+            };
+        };
+    };
+    classifyAdminChatConversation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    category: components["schemas"]["SupportCategory"];
+                };
+            };
+        };
+        responses: {
+            /** @description Support request classified */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        conversation: components["schemas"]["Conversation"];
+                        message: components["schemas"]["ChatMessage"];
+                        classification: components["schemas"]["SupportClassification"];
+                    };
+                };
+            };
+        };
+    };
+    addAdminChatNote: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    content: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Staff-only note stored */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        note: components["schemas"]["SupportNote"];
+                    };
+                };
+            };
+        };
+    };
+    transferAdminChatConversation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    assigneeId: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Live conversation transferred to another support agent */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        conversation: components["schemas"]["Conversation"];
+                        message: components["schemas"]["ChatMessage"];
+                    };
+                };
+            };
+        };
+    };
+    listAdminChatAgents: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Support agents eligible to receive a conversation */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        agents: components["schemas"]["ConversationParticipant"][];
                     };
                 };
             };
@@ -1953,6 +2208,8 @@ export interface operations {
             content: {
                 "application/json": {
                     status: components["schemas"]["OrderStatus"];
+                    reasonCode?: components["schemas"]["AdminCancelReasonCode"];
+                    reason?: string;
                 };
             };
         };
@@ -2167,6 +2424,69 @@ export interface operations {
                 content: {
                     "application/json": {
                         user: components["schemas"]["AdminUser"];
+                    };
+                };
+            };
+        };
+    };
+    updateAdminStaffProfile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    fullName: string;
+                    /** Format: email */
+                    email: string;
+                    phone: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Staff profile updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        user: components["schemas"]["AdminUser"];
+                    };
+                };
+            };
+        };
+    };
+    resetAdminStaffPassword: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    password: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Staff password reset and sessions revoked */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        reset: boolean;
                     };
                 };
             };

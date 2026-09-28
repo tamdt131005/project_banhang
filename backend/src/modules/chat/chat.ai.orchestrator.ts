@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { Prisma } from '@prisma/client';
 import { env } from '../../config/env.js';
 import { prisma } from '../../lib/prisma.js';
+import { customerVisibleMessageWhere } from './chat.dto.js';
 import { chatEvents } from './chat.events.js';
 import type {
   AIChatResult,
@@ -258,7 +259,7 @@ export class ChatAIOrchestrator implements AIOrchestrator {
     if (!conversation) return 'HANDOFF_REQUESTED';
 
     const history = await prisma.chatMessage.findMany({
-      where: { conversationId: input.conversationId },
+      where: { conversationId: input.conversationId, ...customerVisibleMessageWhere },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: env.AI_CHAT_CONTEXT_MESSAGES,
       select: { senderType: true, content: true },

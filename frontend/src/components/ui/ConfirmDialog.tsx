@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { Button } from './Button';
 import { AlertCircleIcon } from './icons';
 
@@ -9,6 +9,8 @@ export interface ConfirmDialogProps {
   confirmLabel?: string;
   danger?: boolean;
   loading?: boolean;
+  confirmDisabled?: boolean;
+  children?: ReactNode;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -25,6 +27,8 @@ export function ConfirmDialog({
   confirmLabel = 'Xác nhận',
   danger = false,
   loading = false,
+  confirmDisabled = false,
+  children,
   onConfirm,
   onCancel,
 }: Readonly<ConfirmDialogProps>) {
@@ -45,7 +49,7 @@ export function ConfirmDialog({
         event.preventDefault();
         onCancel();
       }}
-      className="m-auto w-[min(28rem,calc(100vw-2rem))] rounded-card border border-line bg-surface p-5 text-ink backdrop:bg-black/40"
+      className="m-auto max-h-[calc(100dvh-2rem)] w-[min(28rem,calc(100vw-2rem))] overflow-y-auto rounded-card border border-line bg-surface p-5 text-ink backdrop:bg-black/40"
     >
       <div className="flex items-start gap-3">
         {danger ? (
@@ -62,6 +66,8 @@ export function ConfirmDialog({
         </div>
       </div>
 
+      {children ? <div className="mt-4">{children}</div> : null}
+
       <div className="mt-5 flex justify-end gap-2">
         <Button variant="secondary" size="sm" onClick={onCancel}>
           Huỷ
@@ -70,6 +76,7 @@ export function ConfirmDialog({
           variant={danger ? 'danger' : 'primary'}
           size="sm"
           loading={loading}
+          disabled={confirmDisabled}
           onClick={onConfirm}
         >
           {confirmLabel}

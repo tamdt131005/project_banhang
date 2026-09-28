@@ -32,7 +32,19 @@ export const staffCreateSchema = z.object({
   permissions: permissionsSchema,
 });
 
+export const staffProfileSchema = z.object({
+  fullName: z.string().trim().min(2, 'Họ tên quá ngắn').max(120, 'Họ tên quá dài'),
+  email: emailSchema,
+  phone: phoneSchema.nullable(),
+}).strict();
+
+export const staffPasswordResetSchema = z.object({
+  password: passwordSchema,
+}).strict();
+
 export type UserListQuery = z.infer<typeof userListQuerySchema>;
 export type RoleUpdateInput = z.infer<typeof roleUpdateSchema>;
 export type StaffAccessInput = z.infer<typeof staffAccessSchema>;
 export type StaffCreateInput = z.infer<typeof staffCreateSchema>;
+export type StaffProfileInput = z.infer<typeof staffProfileSchema>;
+export type StaffPasswordResetInput = z.infer<typeof staffPasswordResetSchema>;

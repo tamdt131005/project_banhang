@@ -81,7 +81,10 @@ describe('số liệu tổng quan', () => {
       .send({ addressId: address.id, paymentMethod: 'COD' })
       .expect(201);
 
-    await customer.post(`/api/orders/${created.body.order.code}/cancel`).expect(200);
+    await customer
+      .post(`/api/orders/${created.body.order.code}/cancel`)
+      .send({ reasonCode: 'CHANGED_MIND' })
+      .expect(200);
 
     const stats = await admin.get('/api/admin/stats').expect(200);
     expect(stats.body.orders.cancelled).toBe(1);
@@ -336,7 +339,10 @@ describe('đơn hàng phía admin', () => {
       .send({ paymentStatus: 'PAID' })
       .expect(409);
 
-    await admin.patch(`/api/admin/orders/${orderId}/status`).send({ status: 'CANCELLED' }).expect(200);
+    await admin
+      .patch(`/api/admin/orders/${orderId}/status`)
+      .send({ status: 'CANCELLED', reasonCode: 'CUSTOMER_REQUEST' })
+      .expect(200);
     await admin
       .patch(`/api/admin/orders/${orderId}/payment-status`)
       .send({ paymentStatus: 'UNPAID' })

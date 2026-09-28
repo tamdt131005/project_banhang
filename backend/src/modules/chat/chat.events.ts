@@ -8,6 +8,7 @@ export interface ChatCommittedEvents {
   'support.requested': { conversation: PublicConversation; message: ChatMessage };
   'support.accepted': { conversation: PublicConversation; message: ChatMessage };
   'conversation.closed': { conversation: PublicConversation; message: ChatMessage };
+  'support.transferred': { conversation: PublicConversation; message: ChatMessage };
 }
 
 class ChatEventBus extends EventEmitter {

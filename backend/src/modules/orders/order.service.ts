@@ -88,34 +88,50 @@ export async function createOrder(userId: number, input: OrderCreateInput) {
       throw AppError.badRequest('ADDRESS_NOT_FOUND', 'Không tìm thấy địa chỉ giao hàng này.');
     }
 
-    const cart = await tx.cart.findUnique({
-      where: { userId },
-      include: {
-        items: {
-          orderBy: { createdAt: 'asc' },
-          include: {
-            variant: {
-              include: {
-                product: {
-                  include: {
-                    images: { select: { thumbUrl: true }, orderBy: { sortOrder: 'asc' }, take: 1 },
-                  },
-                },
-              },
-            },
-          },
+    const variantInclude = {
+      product: {
+        include: {
+          images: { select: { thumbUrl: true }, orderBy: { sortOrder: 'asc' as const }, take: 1 },
         },
       },
-    });
+    } satisfies Prisma.ProductVariantInclude;
 
-    if (!cart || cart.items.length === 0) {
+    // Mua ngay chỉ đặt đúng biến thể khách vừa chọn. Giỏ hàng giữ nguyên.
+    const buyNowVariant = input.buyNow
+      ? await tx.productVariant.findUnique({
+          where: { id: input.buyNow.variantId },
+          include: variantInclude,
+        })
+      : null;
+
+    if (input.buyNow && (!buyNowVariant || !buyNowVariant.product.isActive)) {
+      throw AppError.notFound('Sản phẩm không tồn tại hoặc đã ngừng bán.');
+    }
+
+    const cart = input.buyNow
+      ? null
+      : await tx.cart.findUnique({
+          where: { userId },
+          include: {
+            items: {
+              orderBy: { createdAt: 'asc' },
+              include: { variant: { include: variantInclude } },
+            },
+          },
+        });
+
+    const sources = input.buyNow
+      ? [{ quantity: input.buyNow.quantity, variant: buyNowVariant! }]
+      : (cart?.items ?? []).map((item) => ({ quantity: item.quantity, variant: item.variant }));
+
+    if (sources.length === 0) {
       throw AppError.badRequest('CART_EMPTY', 'Giỏ hàng đang trống.');
     }
 
     let subtotal = 0;
     const itemsToCreate: Prisma.OrderItemCreateWithoutOrderInput[] = [];
 
-    for (const item of cart.items) {
+    for (const item of sources) {
       const variant = item.variant;
       const product = variant.product;
 
@@ -169,18 +185,18 @@ export async function createOrder(userId: number, input: OrderCreateInput) {
 
     // OrderItem phải có id trước khi ghi ledger để operationKey của mỗi lần giữ hàng ổn định.
     // Khoá các biến thể theo id tăng dần để giảm nguy cơ deadlock giữa hai giỏ có cùng mặt hàng.
-    for (const cartItem of [...cart.items].sort((a, b) => a.variantId - b.variantId)) {
-      const orderItem = created.items.find((item) => item.variantId === cartItem.variantId);
+    for (const source of [...sources].sort((a, b) => a.variant.id - b.variant.id)) {
+      const orderItem = created.items.find((item) => item.variantId === source.variant.id);
       if (!orderItem) {
-        throw new Error(`Không ghép được OrderItem với variant ${cartItem.variantId}.`);
+        throw new Error(`Không ghép được OrderItem với variant ${source.variant.id}.`);
       }
       await reserveOrderItem(tx, {
         orderId: created.id,
         orderItemId: orderItem.id,
-        variantId: cartItem.variantId,
+        variantId: source.variant.id,
         productName: orderItem.productName,
-        size: orderItem.size ?? cartItem.variant.size,
-        color: orderItem.color ?? cartItem.variant.color,
+        size: orderItem.size ?? source.variant.size,
+        color: orderItem.color ?? source.variant.color,
         quantity: orderItem.quantity,
         actor: { type: 'CUSTOMER', userId },
       });
@@ -199,7 +215,9 @@ export async function createOrder(userId: number, input: OrderCreateInput) {
       },
     });
 
-    await tx.cartItem.deleteMany({ where: { cartId: cart.id } });
+    if (cart) {
+      await tx.cartItem.deleteMany({ where: { cartId: cart.id } });
+    }
 
     return tx.order.update({
       where: { id: created.id },
@@ -264,8 +282,20 @@ export async function getMyOrder(userId: number, code: string) {
 }
 
 type TransitionRequest =
-  | { actorType: 'CUSTOMER'; actorUserId: number; code: string; next: 'CANCELLED' }
-  | { actorType: 'ADMIN'; actorUserId: number; orderId: number; next: OrderStatus };
+  | {
+      actorType: 'CUSTOMER';
+      actorUserId: number;
+      code: string;
+      next: 'CANCELLED';
+      reason: string;
+    }
+  | {
+      actorType: 'ADMIN';
+      actorUserId: number;
+      orderId: number;
+      next: OrderStatus;
+      reason?: string;
+    };
 
 /**
  * The single order-state mutation seam. A conditional update claims the expected state before
@@ -317,6 +347,14 @@ async function transitionOrderStatus(request: TransitionRequest) {
     );
   }
 
+  const cancelReason = next === 'CANCELLED' ? request.reason?.trim() : undefined;
+  if (next === 'CANCELLED' && !cancelReason) {
+    throw AppError.badRequest(
+      'CANCEL_REASON_REQUIRED',
+      'Vui lòng chọn lý do có sẵn hoặc tự điền lý do huỷ đơn.',
+    );
+  }
+
   const transitioned = await prisma.$transaction(async (tx) => {
     const claimed = await tx.order.updateMany({
       where: { id: current.id, status: current.status },
@@ -345,6 +383,7 @@ async function transitionOrderStatus(request: TransitionRequest) {
         toStatus: next,
         actorType: request.actorType,
         actorUserId: request.actorUserId,
+        ...(cancelReason === undefined ? {} : { reason: cancelReason }),
         occurredAt: new Date(),
         operationKey: `ORDER_TRANSITION:${current.id}:${current.status}:${next}`,
       },
@@ -376,12 +415,13 @@ async function transitionOrderStatus(request: TransitionRequest) {
   );
 }
 
-export function cancelMyOrder(userId: number, code: string) {
+export function cancelMyOrder(userId: number, code: string, reason: string) {
   return transitionOrderStatus({
     actorType: 'CUSTOMER',
     actorUserId: userId,
     code,
     next: 'CANCELLED',
+    reason,
   });
 }
 
@@ -450,12 +490,18 @@ export async function getOrderByCode(code: string) {
   return order;
 }
 
-export function updateOrderStatus(orderId: number, next: OrderStatus, adminUserId: number) {
+export function updateOrderStatus(
+  orderId: number,
+  next: OrderStatus,
+  adminUserId: number,
+  reason?: string,
+) {
   return transitionOrderStatus({
     actorType: 'ADMIN',
     actorUserId: adminUserId,
     orderId,
     next,
+    ...(reason === undefined ? {} : { reason }),
   });
 }
 

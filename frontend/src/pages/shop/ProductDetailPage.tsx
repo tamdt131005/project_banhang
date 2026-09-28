@@ -8,6 +8,7 @@ import { ArrowLeftIcon, BagIcon, BoxIcon, ChevronRightIcon } from '../../compone
 import { QuantityStepper } from '../../components/ui/QuantityStepper';
 import { useAuth } from '../../context/AuthContext';
 import { useAddToCart } from '../../hooks/useCart';
+import type { BuyNowRequest } from '../../lib/buy-now';
 import { errorMessage } from '../../lib/errors';
 import { formatVnd } from '../../lib/format';
 import type { ApiVariant } from '../../types/api';
@@ -145,15 +146,18 @@ export function ProductDetailPage({}: Readonly<ProductDetailPageProps>) {
     setQuantity(1);
   }
 
+  function requireUser(buyNow?: BuyNowRequest) {
+    if (user) return true;
+    void navigate('/dang-nhap', {
+      state: buyNow ? { from: '/thanh-toan', buyNow } : { from: location.pathname },
+    });
+    return false;
+  }
+
   async function handleAddToCart() {
     // Giỏ hàng lưu trên server nên phải đăng nhập trước. Nhớ đường dẫn hiện
     // tại để sau khi đăng nhập quay lại đúng sản phẩm này.
-    if (!user) {
-      void navigate('/dang-nhap', { state: { from: location.pathname } });
-      return;
-    }
-
-    if (!selected) return;
+    if (!selected || !requireUser()) return;
 
     setFeedback(null);
     try {
@@ -165,6 +169,13 @@ export function ProductDetailPage({}: Readonly<ProductDetailPageProps>) {
     } catch (error) {
       setFeedback({ tone: 'error', text: errorMessage(error) });
     }
+  }
+
+  function handleBuyNow() {
+    if (!selected) return;
+    const buyNow: BuyNowRequest = { slug: product.slug, variantId: selected.id, quantity };
+    if (!requireUser(buyNow)) return;
+    void navigate('/thanh-toan', { state: { buyNow } });
   }
 
   return (
@@ -288,20 +299,24 @@ export function ProductDetailPage({}: Readonly<ProductDetailPageProps>) {
               />
             </div>
 
-            <Button
-              onClick={() => void handleAddToCart()}
-              disabled={!selected || selected.stock <= 0}
-              loading={addToCart.isPending}
-            >
-              {soldOutEverywhere || (selected !== null && selected.stock <= 0) ? (
-                'Hết hàng'
-              ) : (
-                <>
+            {soldOutEverywhere || (selected !== null && selected.stock <= 0) ? (
+              <Button disabled>Hết hàng</Button>
+            ) : (
+              <>
+                <Button
+                  variant="secondary"
+                  onClick={() => void handleAddToCart()}
+                  disabled={!selected}
+                  loading={addToCart.isPending}
+                >
                   <BagIcon className="size-4" />
                   Thêm vào giỏ
-                </>
-              )}
-            </Button>
+                </Button>
+                <Button onClick={handleBuyNow} disabled={!selected || addToCart.isPending}>
+                  Mua ngay
+                </Button>
+              </>
+            )}
           </div>
 
           {feedback ? (

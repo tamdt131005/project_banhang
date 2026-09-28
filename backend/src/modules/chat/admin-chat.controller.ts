@@ -4,6 +4,9 @@ import {
   chatMessageSchema,
   conversationParamSchema,
   messageListQuerySchema,
+  supportCategorySchema,
+  supportNoteSchema,
+  transferConversationSchema,
 } from './chat.schema.js';
 import * as chatService from './chat.service.js';
 
@@ -32,4 +35,26 @@ export const adminSendMessageHandler: RequestHandler = async (req, res) => {
 export const adminCloseConversationHandler: RequestHandler = async (req, res) => {
   const { id } = conversationParamSchema.parse(req.params);
   res.json(await chatService.closeConversation(req.user!.id, id));
+};
+
+export const adminClassifyConversationHandler: RequestHandler = async (req, res) => {
+  const { id } = conversationParamSchema.parse(req.params);
+  const input = supportCategorySchema.parse(req.body);
+  res.json(await chatService.classifyConversation(req.user!.id, id, input));
+};
+
+export const adminAddConversationNoteHandler: RequestHandler = async (req, res) => {
+  const { id } = conversationParamSchema.parse(req.params);
+  const input = supportNoteSchema.parse(req.body);
+  res.status(201).json(await chatService.addConversationNote(req.user!.id, id, input));
+};
+
+export const adminTransferConversationHandler: RequestHandler = async (req, res) => {
+  const { id } = conversationParamSchema.parse(req.params);
+  const input = transferConversationSchema.parse(req.body);
+  res.json(await chatService.transferConversation(req.user!.id, id, input));
+};
+
+export const adminListSupportAgentsHandler: RequestHandler = async (_req, res) => {
+  res.json(await chatService.listSupportAgents());
 };

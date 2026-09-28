@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { adminGateway } from '../../api/admin';
+import { CancelReasonForm, useCancelReason } from '../../components/order/CancelReasonForm';
 import { OrderStatusBadge } from '../../components/order/OrderStatusBadge';
 import { OrderSummary } from '../../components/order/OrderSummary';
 import { OrderTimeline } from '../../components/order/OrderTimeline';
@@ -16,6 +17,7 @@ import {
   type OrderStatus,
   formatDateTime,
 } from '../../lib/format';
+import { ADMIN_CANCEL_REASONS, type CancelReasonPayload } from '../../lib/order-cancel';
 
 /** Trang định tuyến không nhận prop; dữ liệu lấy từ URL và API. */
 export interface AdminOrderDetailPageProps {}
@@ -36,6 +38,7 @@ export function AdminOrderDetailPage({}: Readonly<AdminOrderDetailPageProps>) {
   const { code = '' } = useParams<{ code: string }>();
   const queryClient = useQueryClient();
   const [pendingStatus, setPendingStatus] = useState<OrderStatus | null>(null);
+  const cancelReason = useCancelReason();
 
   const order = useQuery({
     queryKey: ['admin', 'order', code],
@@ -44,7 +47,8 @@ export function AdminOrderDetailPage({}: Readonly<AdminOrderDetailPageProps>) {
   });
 
   const changeStatus = useMutation({
-    mutationFn: (status: OrderStatus) => adminGateway.orders.setStatus(order.data!.id, status),
+    mutationFn: (input: { status: OrderStatus; cancelReason?: CancelReasonPayload }) =>
+      adminGateway.orders.setStatus(order.data!.id, input.status, input.cancelReason),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['admin', 'order', code] });
       void queryClient.invalidateQueries({ queryKey: ['admin', 'orders'] });
@@ -143,7 +147,10 @@ export function AdminOrderDetailPage({}: Readonly<AdminOrderDetailPageProps>) {
                   key={status}
                   variant={status === 'CANCELLED' ? 'danger' : 'primary'}
                   size="sm"
-                  onClick={() => setPendingStatus(status)}
+                  onClick={() => {
+                    cancelReason.reset();
+                    setPendingStatus(status);
+                  }}
                 >
                   {ORDER_STATUS_LABEL[status]}
                 </Button>
@@ -211,11 +218,39 @@ export function AdminOrderDetailPage({}: Readonly<AdminOrderDetailPageProps>) {
         }
         confirmLabel="Xác nhận"
         loading={changeStatus.isPending}
+        confirmDisabled={pendingStatus === 'CANCELLED' && cancelReason.payload === null}
         onConfirm={() => {
-          if (pendingStatus) changeStatus.mutate(pendingStatus);
+          if (!pendingStatus) return;
+          if (pendingStatus === 'CANCELLED') {
+            if (!cancelReason.payload) return;
+            changeStatus.mutate({ status: pendingStatus, cancelReason: cancelReason.payload });
+            return;
+          }
+          changeStatus.mutate({ status: pendingStatus });
         }}
-        onCancel={() => setPendingStatus(null)}
-      />
+        onCancel={() => {
+          if (changeStatus.isPending) return;
+          setPendingStatus(null);
+          cancelReason.reset();
+        }}
+      >
+        {changeStatus.isError ? (
+          <div className="mb-3">
+            <Alert>{errorMessage(changeStatus.error)}</Alert>
+          </div>
+        ) : null}
+        {pendingStatus === 'CANCELLED' ? (
+          <CancelReasonForm
+            reasons={ADMIN_CANCEL_REASONS}
+            mode={cancelReason.mode}
+            reasonCode={cancelReason.reasonCode}
+            customReason={cancelReason.customReason}
+            onModeChange={cancelReason.setMode}
+            onReasonCodeChange={cancelReason.setReasonCode}
+            onCustomReasonChange={cancelReason.setCustomReason}
+          />
+        ) : null}
+      </ConfirmDialog>
     </div>
   );
 }

@@ -6,6 +6,7 @@ import { TextField } from '../../components/ui/Field';
 import { Alert } from '../../components/ui/Feedback';
 import { useAuth } from '../../context/AuthContext';
 import { errorMessage, fieldErrors } from '../../lib/errors';
+import { readBuyNow } from '../../lib/buy-now';
 import { staffLandingPath } from '../../lib/staffLanding';
 
 export function LoginPage() {
@@ -21,6 +22,7 @@ export function LoginPage() {
 
   // Quay lại đúng trang người dùng định vào trước khi bị chặn.
   const from = (location.state as { from?: string } | null)?.from ?? '/';
+  const buyNow = readBuyNow(location.state);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -33,7 +35,10 @@ export function LoginPage() {
       const destination = user.role === 'USER'
         ? (from.startsWith('/admin') ? '/' : from)
         : staffLandingPath(user);
-      void navigate(destination, { replace: true });
+      void navigate(destination, {
+        replace: true,
+        ...(user.role === 'USER' && buyNow ? { state: { buyNow } } : {}),
+      });
     } catch (error) {
       setMessage(errorMessage(error));
       setFields(fieldErrors(error));

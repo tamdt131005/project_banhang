@@ -5,6 +5,7 @@ import {
   type AdminChatConversation,
   type AdminChatMessage,
   type AdminChatStatus,
+  type SupportCategory,
   adminGateway,
 } from '../../api/admin';
 import { Button } from '../../components/ui/Button';
@@ -16,6 +17,7 @@ import {
   ChevronRightIcon,
   MessageIcon,
   RefreshIcon,
+  SearchIcon,
   SendIcon,
   SparkleIcon,
   UsersIcon,
@@ -24,12 +26,22 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { type ChatRealtimeEvent, useChatRealtime } from '../../hooks/useChatRealtime';
 import { errorMessage } from '../../lib/errors';
-import { formatDateTime, formatVnd } from '../../lib/format';
+import { formatDateTime, formatVnd, ORDER_STATUS_LABEL } from '../../lib/format';
 
 export interface AdminSupportPageProps {}
 
 type SupportTab = Extract<AdminChatStatus, 'WAITING_ADMIN' | 'LIVE' | 'CLOSED'>;
 type MessagePage = number | 'latest';
+
+const SUPPORT_CATEGORIES: { value: SupportCategory; label: string }[] = [
+  { value: 'DON_HANG', label: 'Đơn hàng' },
+  { value: 'SAN_PHAM', label: 'Sản phẩm' },
+  { value: 'GIAO_HANG', label: 'Giao hàng' },
+  { value: 'THANH_TOAN', label: 'Thanh toán' },
+  { value: 'DOI_TRA', label: 'Đổi trả' },
+  { value: 'TAI_KHOAN', label: 'Tài khoản' },
+  { value: 'KHAC', label: 'Khác' },
+];
 
 const TABS: { status: SupportTab; label: string; description: string; badgeColor: string }[] = [
   {
@@ -253,6 +265,7 @@ export function AdminSupportPage({}: Readonly<AdminSupportPageProps>) {
   const queryClient = useQueryClient();
   const [params, setParams] = useSearchParams();
   const [content, setContent] = useState('');
+  const [note, setNote] = useState('');
   const [messagePage, setMessagePage] = useState<MessagePage>('latest');
   const messageEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -260,24 +273,44 @@ export function AdminSupportPage({}: Readonly<AdminSupportPageProps>) {
   const statusParam = params.get('status');
   const status: SupportTab = isSupportTab(statusParam) ? statusParam : 'WAITING_ADMIN';
   const page = Math.max(1, Number(params.get('page') ?? 1) || 1);
+  const searchQuery = params.get('q')?.trim() ?? '';
+  const [searchDraft, setSearchDraft] = useState(searchQuery);
   const conversationId = Number(params.get('conversation')) || null;
 
-  function updateParams(next: { status?: SupportTab; page?: number; conversation?: number | null }) {
+  useEffect(() => {
+    setSearchDraft(searchQuery);
+  }, [searchQuery]);
+
+  function updateParams(next: {
+    status?: SupportTab;
+    page?: number;
+    conversation?: number | null;
+    q?: string | null;
+  }) {
     const updated = new URLSearchParams(params);
     if (next.status !== undefined) updated.set('status', next.status);
     if (next.page !== undefined && next.page > 1) updated.set('page', String(next.page));
     else if (next.page !== undefined) updated.delete('page');
     if (next.conversation === null) updated.delete('conversation');
     else if (next.conversation !== undefined) updated.set('conversation', String(next.conversation));
+    if (next.q === null) updated.delete('q');
+    else if (next.q !== undefined) {
+      const trimmed = next.q.trim();
+      if (trimmed) updated.set('q', trimmed);
+      else updated.delete('q');
+    }
     if (next.conversation !== undefined) setMessagePage('latest');
     setParams(updated);
   }
 
-  useEffect(() => setMessagePage('latest'), [conversationId]);
+  useEffect(() => {
+    setMessagePage('latest');
+    setNote('');
+  }, [conversationId]);
 
   const conversations = useQuery({
-    queryKey: ['admin', 'chat', 'conversations', { status, page }],
-    queryFn: () => adminGateway.chat.list({ status, page, limit: 20 }),
+    queryKey: ['admin', 'chat', 'conversations', { status, page, q: searchQuery }],
+    queryFn: () => adminGateway.chat.list({ status, page, limit: 20, q: searchQuery || undefined }),
   });
 
   // Query counts for tabs
@@ -359,6 +392,35 @@ export function AdminSupportPage({}: Readonly<AdminSupportPageProps>) {
     },
   });
 
+  const classify = useMutation({
+    mutationFn: (category: SupportCategory) => adminGateway.chat.classify(conversationId!, category),
+    onSuccess: () => {
+      setMessagePage('latest');
+      refreshAll();
+    },
+  });
+
+  const saveNote = useMutation({
+    mutationFn: (text: string) => adminGateway.chat.note(conversationId!, text),
+    onSuccess: () => {
+      setNote('');
+      refreshAll();
+    },
+  });
+
+  const transfer = useMutation({
+    mutationFn: (assigneeId: number) => adminGateway.chat.transfer(conversationId!, assigneeId),
+    onSuccess: () => {
+      setMessagePage('latest');
+      refreshAll();
+    },
+  });
+
+  const agents = useQuery({
+    queryKey: ['admin', 'chat', 'agents'],
+    queryFn: () => adminGateway.chat.agents(),
+  });
+
   function submitReply(event?: FormEvent) {
     event?.preventDefault();
     const text = content.trim();
@@ -380,7 +442,8 @@ export function AdminSupportPage({}: Readonly<AdminSupportPageProps>) {
 
   const selected = detail.data?.conversation ?? null;
   const canReply = selected?.status === 'LIVE' && selected.assignedAdminId === user?.id;
-  const mutationError = accept.error ?? reply.error ?? close.error;
+  const canClose = selected?.status === 'WAITING_ADMIN' || canReply;
+  const mutationError = accept.error ?? reply.error ?? close.error ?? classify.error ?? saveNote.error ?? transfer.error;
   const activeTab = TABS.find((tab) => tab.status === status)!;
 
   return (
@@ -467,10 +530,31 @@ export function AdminSupportPage({}: Readonly<AdminSupportPageProps>) {
           aria-label="Danh sách cuộc trò chuyện"
           className="flex h-full min-h-0 flex-col overflow-hidden rounded-card border border-line bg-surface shadow-xs"
         >
-          <div className="border-b border-line bg-sunken/40 px-3.5 py-2.5 shrink-0">
+          <div className="space-y-2 border-b border-line bg-sunken/40 px-3.5 py-2.5 shrink-0">
             <h2 className="font-semibold text-xs uppercase tracking-wider text-ink-muted">
               {activeTab.label} ({conversations.data?.pagination.total ?? 0})
             </h2>
+            <form
+              className="flex gap-2"
+              onSubmit={(event) => {
+                event.preventDefault();
+                updateParams({ q: searchDraft, page: 1, conversation: null });
+              }}
+            >
+              <label htmlFor="support-search" className="sr-only">
+                Lọc hoặc tìm kiếm cuộc trò chuyện
+              </label>
+              <input
+                id="support-search"
+                value={searchDraft}
+                onChange={(event) => setSearchDraft(event.target.value)}
+                placeholder="Tên, email, SĐT hoặc mã cuộc trò chuyện"
+                className="min-w-0 flex-1 rounded-control border border-line bg-surface px-2.5 py-1.5 text-xs outline-none focus:border-accent"
+              />
+              <Button type="submit" size="sm" variant="secondary" aria-label="Tìm kiếm">
+                <SearchIcon className="size-3.5" />
+              </Button>
+            </form>
           </div>
 
           {conversations.isPending ? (
@@ -487,7 +571,11 @@ export function AdminSupportPage({}: Readonly<AdminSupportPageProps>) {
             <div className="p-6 flex-1 flex flex-col justify-center">
               <EmptyState
                 title="Không có cuộc trò chuyện"
-                description={activeTab.description}
+                description={
+                  searchQuery
+                    ? `Không có cuộc trò chuyện khớp “${searchQuery}”.`
+                    : activeTab.description
+                }
                 icon={<MessageIcon className="size-8 text-ink-muted/60" />}
               />
             </div>
@@ -609,7 +697,7 @@ export function AdminSupportPage({}: Readonly<AdminSupportPageProps>) {
                     </Button>
                   ) : null}
 
-                  {canReply ? (
+                  {canClose ? (
                     <Button
                       size="sm"
                       variant="danger"
@@ -618,11 +706,95 @@ export function AdminSupportPage({}: Readonly<AdminSupportPageProps>) {
                       className="inline-flex items-center gap-1.5"
                     >
                       <XIcon className="size-3.5" />
-                      <span>Đóng cuộc trò chuyện</span>
+                      <span>Đánh dấu đã xử lý</span>
                     </Button>
                   ) : null}
                 </div>
               </header>
+
+              <section aria-label="Thông tin khách hàng" className="shrink-0 border-b border-line bg-sunken/40 px-4 py-2.5">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0 text-xs">
+                    <p className="font-semibold text-ink">{detail.data.customer.fullName}</p>
+                    <p className="text-ink-muted">{detail.data.customer.email}</p>
+                    <p className="text-ink-muted">{detail.data.customer.phone || 'Chưa có số điện thoại'}</p>
+                    <p className="mt-1 text-ink">
+                      {detail.data.customer.address
+                        ? `${detail.data.customer.address.line1}, ${detail.data.customer.address.ward}, ${detail.data.customer.address.district}, ${detail.data.customer.address.province}`
+                        : 'Chưa có địa chỉ'}
+                    </p>
+                  </div>
+                  <div className="min-w-0 text-xs">
+                    <p className="font-semibold text-ink-muted">Đơn gần đây</p>
+                    {detail.data.customer.orders.length === 0 ? (
+                      <p className="text-ink-muted">Chưa có đơn hàng</p>
+                    ) : (
+                      <ul className="mt-1 space-y-1">
+                        {detail.data.customer.orders.map((order) => (
+                          <li key={order.id}>
+                            <span className="font-medium text-ink">{order.code}</span>
+                            <span className="text-ink-muted">
+                              {' '}
+                              · {ORDER_STATUS_LABEL[order.status]} · {formatVnd(order.total)}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                </div>
+              </section>
+
+              {canReply ? (
+                <div className="flex flex-wrap items-center gap-2 border-b border-line px-4 py-2 shrink-0">
+                  <label htmlFor="support-category" className="text-xs font-medium text-ink">
+                    Phân loại yêu cầu
+                  </label>
+                  <select
+                    id="support-category"
+                    value={detail.data.classification?.category ?? ''}
+                    disabled={classify.isPending}
+                    onChange={(event) => {
+                      const category = event.target.value as SupportCategory;
+                      if (category) classify.mutate(category);
+                    }}
+                    className="rounded-control border border-line bg-surface px-2 py-1 text-xs outline-none focus:border-accent"
+                  >
+                    <option value="">Chọn loại yêu cầu</option>
+                    {SUPPORT_CATEGORIES.map((item) => (
+                      <option key={item.value} value={item.value}>
+                        {item.label}
+                      </option>
+                    ))}
+                  </select>
+                  <label htmlFor="support-transfer" className="text-xs font-medium text-ink">
+                    Chuyển nhân viên
+                  </label>
+                  <select
+                    id="support-transfer"
+                    value=""
+                    disabled={transfer.isPending}
+                    onChange={(event) => {
+                      const assigneeId = Number(event.target.value);
+                      if (assigneeId) transfer.mutate(assigneeId);
+                    }}
+                    className="rounded-control border border-line bg-surface px-2 py-1 text-xs outline-none focus:border-accent"
+                  >
+                    <option value="">Chọn nhân viên khác</option>
+                    {(agents.data?.agents ?? [])
+                      .filter((agent) => agent.id !== user?.id)
+                      .map((agent) => (
+                        <option key={agent.id} value={agent.id}>
+                          {agent.fullName || agent.email}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              ) : detail.data.classification ? (
+                <p className="shrink-0 border-b border-line px-4 py-2 text-xs text-ink-muted">
+                  Phân loại: <span className="font-medium text-ink">{detail.data.classification.label}</span>
+                </p>
+              ) : null}
 
               {/* Phân trang tin nhắn nếu quá dài */}
               {detail.data.pagination.totalPages > 1 ? (
@@ -656,7 +828,9 @@ export function AdminSupportPage({}: Readonly<AdminSupportPageProps>) {
               <div
                 className="flex-1 min-h-0 space-y-3 overflow-y-auto bg-canvas/40 p-4"
                 aria-live="polite"
+                aria-label="Lịch sử trao đổi"
               >
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-ink-muted">Lịch sử trao đổi</h3>
                 {detail.data.messages.length === 0 ? (
                   <p className="py-12 text-center text-sm text-ink-muted">Chưa có tin nhắn nào trong cuộc trò chuyện này.</p>
                 ) : (
@@ -766,6 +940,45 @@ export function AdminSupportPage({}: Readonly<AdminSupportPageProps>) {
               </div>
 
               {/* Chat Input / Action Footer (Fixed at bottom) */}
+              <section aria-label="Ghi chú cuộc trò chuyện" className="shrink-0 space-y-2 border-t border-line bg-sunken/30 px-3 py-2">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-ink-muted">Ghi chú nội bộ</h3>
+                {detail.data.notes.length === 0 ? (
+                  <p className="text-xs text-ink-muted">Chưa có ghi chú. Khách hàng không thấy phần này.</p>
+                ) : (
+                  <ul className="max-h-24 space-y-1 overflow-y-auto">
+                    {detail.data.notes.map((item) => (
+                      <li key={item.id} className="text-xs text-ink">
+                        <span className="font-medium">{item.author?.fullName || 'Nhân viên'}</span>
+                        <span className="text-ink-muted"> · {formatDateTime(item.createdAt)} · </span>
+                        <span className="whitespace-pre-wrap">{item.content}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <form
+                  className="flex gap-2"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    const text = note.trim();
+                    if (text && !saveNote.isPending) saveNote.mutate(text);
+                  }}
+                >
+                  <label htmlFor="support-note" className="sr-only">
+                    Ghi chú cuộc trò chuyện
+                  </label>
+                  <input
+                    id="support-note"
+                    value={note}
+                    onChange={(event) => setNote(event.target.value)}
+                    placeholder="Thêm ghi chú cho nhân viên"
+                    className="min-w-0 flex-1 rounded-control border border-line bg-surface px-2.5 py-1.5 text-xs outline-none focus:border-accent"
+                  />
+                  <Button type="submit" size="sm" variant="secondary" disabled={!note.trim()} loading={saveNote.isPending}>
+                    Lưu ghi chú
+                  </Button>
+                </form>
+              </section>
+
               <div className="space-y-2 border-t border-line bg-surface p-3 shrink-0">
                 {mutationError ? <Alert>{errorMessage(mutationError)}</Alert> : null}
 
@@ -817,7 +1030,7 @@ export function AdminSupportPage({}: Readonly<AdminSupportPageProps>) {
                         </Button>
                       </div>
                     ) : detail.data.conversation.status === 'CLOSED' ? (
-                      <span>Cuộc trò chuyện này đã kết thúc và được lưu vào lịch sử.</span>
+                      <span>Cuộc trò chuyện này đã được đánh dấu đã xử lý.</span>
                     ) : (
                       <span>
                         Cuộc trò chuyện đã được phân công cho nhân viên{' '}

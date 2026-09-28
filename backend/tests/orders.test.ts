@@ -2,6 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { env } from '../src/config/env.js';
 import { prisma } from '../src/lib/prisma.js';
 import {
+  ADMIN_CANCEL_REASON_LABEL,
+  CUSTOMER_CANCEL_REASON_LABEL,
+} from '../src/modules/orders/order.schema.js';
+import {
   type Agent,
   CUSTOMER,
   addVariant,
@@ -34,12 +38,89 @@ async function readyToCheckout(options?: { stock?: number; price?: number; quant
   return { customer, admin, product, address, userId: user.id };
 }
 
+function cancelReasonOf(order: {
+  statusHistory?: { toStatus: string; reason: string | null }[];
+}) {
+  return order.statusHistory?.find((entry) => entry.toStatus === 'CANCELLED')?.reason;
+}
+
 /** Tồn kho của một biến thể — nơi duy nhất còn giữ số tồn thật. */
 function variantStockOf(variantId: number) {
   return prisma.productVariant
     .findUniqueOrThrow({ where: { id: variantId }, select: { stock: true } })
     .then((row) => row.stock);
 }
+
+describe('mua ngay', () => {
+  it('đặt đúng một biến thể và giữ nguyên giỏ hàng', async () => {
+    const { customer, product, address } = await readyToCheckout({ stock: 10, quantity: 2 });
+    const direct = await seedProduct({
+      categoryId: product.categoryId,
+      name: 'Áo mua ngay',
+      price: 89_000,
+      stock: 4,
+    });
+
+    const response = await customer
+      .post('/api/orders')
+      .send({
+        addressId: address.id,
+        paymentMethod: 'COD',
+        buyNow: { variantId: direct.variant.id, quantity: 1 },
+      })
+      .expect(201);
+
+    expect(response.body.order.items).toMatchObject([
+      { productName: 'Áo mua ngay', quantity: 1, unitPrice: 89_000 },
+    ]);
+    expect(response.body.order.subtotal).toBe(89_000);
+    expect(response.body.order.total).toBe(89_000 + env.SHIPPING_FEE);
+    expect(await variantStockOf(direct.variant.id)).toBe(3);
+    expect(await variantStockOf(product.variant.id)).toBe(10);
+
+    const cart = await customer.get('/api/cart').expect(200);
+    expect(cart.body.cart.items).toHaveLength(1);
+    expect(cart.body.cart.items[0].variantId).toBe(product.variant.id);
+    expect(cart.body.cart.items[0].quantity).toBe(2);
+  });
+
+  it('từ chối mua ngay khi không đủ hàng', async () => {
+    const { customer, address, product } = await readyToCheckout({ stock: 5, quantity: 1 });
+
+    const response = await customer
+      .post('/api/orders')
+      .send({
+        addressId: address.id,
+        paymentMethod: 'COD',
+        buyNow: { variantId: product.variant.id, quantity: 6 },
+      })
+      .expect(409);
+
+    expect(response.body.error.code).toBe('OUT_OF_STOCK');
+    expect(await variantStockOf(product.variant.id)).toBe(5);
+    const cart = await customer.get('/api/cart').expect(200);
+    expect(cart.body.cart.items[0].quantity).toBe(1);
+  });
+
+  it('đặt được khi giỏ đang trống', async () => {
+    const { customer, product, address } = await readyToCheckout({ stock: 5, quantity: 1 });
+    await customer.delete('/api/cart').expect(200);
+
+    const created = await customer
+      .post('/api/orders')
+      .send({
+        addressId: address.id,
+        paymentMethod: 'COD',
+        buyNow: { variantId: product.variant.id, quantity: 2 },
+      })
+      .expect(201);
+
+    expect(created.body.order.items).toMatchObject([{ quantity: 2 }]);
+    expect(await variantStockOf(product.variant.id)).toBe(3);
+    const cart = await customer.get('/api/cart').expect(200);
+    expect(cart.body.cart.items).toHaveLength(0);
+  });
+});
 
 describe('tạo đơn hàng', () => {
   it('trừ tồn kho, dọn giỏ và sinh mã đơn', async () => {
@@ -253,18 +334,47 @@ describe('xem và huỷ đơn', () => {
 
     const cancelled = await customer
       .post(`/api/orders/${created.body.order.code}/cancel`)
+      .send({ reasonCode: 'CHANGED_MIND' })
       .expect(200);
 
     expect(cancelled.body.order.status).toBe('CANCELLED');
     expect(cancelled.body.replayed).toBe(false);
     expect(await variantStockOf(product.variant.id)).toBe(10);
+    expect(cancelReasonOf(cancelled.body.order)).toBe(CUSTOMER_CANCEL_REASON_LABEL.CHANGED_MIND);
 
     const replay = await customer
       .post(`/api/orders/${created.body.order.code}/cancel`)
+      .send({ reasonCode: 'OTHER', reason: 'Lý do khác khi gửi lại' })
       .expect(200);
     expect(replay.body.order.status).toBe('CANCELLED');
     expect(replay.body.replayed).toBe(true);
     expect(await variantStockOf(product.variant.id)).toBe(10);
+    expect(cancelReasonOf(replay.body.order)).toBe(CUSTOMER_CANCEL_REASON_LABEL.CHANGED_MIND);
+  });
+
+  it('bắt buộc lý do có sẵn hoặc lý do tự điền khi khách huỷ', async () => {
+    const { customer, address } = await readyToCheckout();
+    const created = await customer
+      .post('/api/orders')
+      .send({ addressId: address.id, paymentMethod: 'COD' })
+      .expect(201);
+    const cancelUrl = `/api/orders/${created.body.order.code}/cancel`;
+
+    const missing = await customer.post(cancelUrl).send({}).expect(400);
+    expect(missing.body.error.code).toBe('VALIDATION_ERROR');
+
+    const blank = await customer
+      .post(cancelUrl)
+      .send({ reasonCode: 'OTHER', reason: '   ' })
+      .expect(400);
+    expect(blank.body.error.code).toBe('VALIDATION_ERROR');
+
+    const custom = await customer
+      .post(cancelUrl)
+      .send({ reason: 'Đặt nhầm số lượng' })
+      .expect(200);
+    expect(custom.body.order.status).toBe('CANCELLED');
+    expect(cancelReasonOf(custom.body.order)).toBe('Đặt nhầm số lượng');
   });
 
   it('không cho khách tự huỷ đơn đã xác nhận', async () => {
@@ -281,6 +391,7 @@ describe('xem và huỷ đơn', () => {
 
     const response = await customer
       .post(`/api/orders/${created.body.order.code}/cancel`)
+      .send({ reasonCode: 'CHANGED_MIND' })
       .expect(409);
 
     expect(response.body.error.code).toBe('ORDER_NOT_CANCELLABLE');
@@ -351,7 +462,11 @@ describe('quản trị đơn hàng', () => {
     async function rejects(status: string) {
       const response = await admin
         .patch(`/api/admin/orders/${orderId}/status`)
-        .send({ status })
+        .send(
+          status === 'CANCELLED'
+            ? { status, reasonCode: 'CUSTOMER_REQUEST' }
+            : { status },
+        )
         .expect(409);
       expect(response.body.error.code).toBe('INVALID_STATUS_TRANSITION');
     }
@@ -381,11 +496,18 @@ describe('quản trị đơn hàng', () => {
       .send({ status: 'CONFIRMED' })
       .expect(200);
 
-    const cancelled = await admin
+    const missingReason = await admin
       .patch(`/api/admin/orders/${orderId}/status`)
       .send({ status: 'CANCELLED' })
+      .expect(400);
+    expect(missingReason.body.error.code).toBe('VALIDATION_ERROR');
+
+    const cancelled = await admin
+      .patch(`/api/admin/orders/${orderId}/status`)
+      .send({ status: 'CANCELLED', reasonCode: 'OUT_OF_STOCK' })
       .expect(200);
     expect(cancelled.body.order.status).toBe('CANCELLED');
+    expect(cancelReasonOf(cancelled.body.order)).toBe(ADMIN_CANCEL_REASON_LABEL.OUT_OF_STOCK);
     expect(cancelled.body.replayed).toBe(false);
     expect(await variantStockOf(variantId)).toBe(10);
   });
@@ -397,12 +519,16 @@ describe('quản trị đơn hàng', () => {
       Array.from({ length: 10 }, () =>
         admin
           .patch(`/api/admin/orders/${orderId}/status`)
-          .send({ status: 'CANCELLED' })
+          .send({ status: 'CANCELLED', reasonCode: 'CUSTOMER_REQUEST' })
           .expect(200),
       ),
     );
 
-    expect(responses.filter((response) => response.body.replayed === false)).toHaveLength(1);
+    const winners = responses.filter((response) => response.body.replayed === false);
+    expect(winners).toHaveLength(1);
+    const winner = winners[0];
+    expect(winner).toBeDefined();
+    expect(cancelReasonOf(winner!.body.order)).toBe(ADMIN_CANCEL_REASON_LABEL.CUSTOMER_REQUEST);
     expect(responses.filter((response) => response.body.replayed === true)).toHaveLength(9);
     expect(await variantStockOf(variantId)).toBe(10);
     expect(
@@ -424,14 +550,14 @@ describe('quản trị đơn hàng', () => {
 
     const shippingCancel = await admin
       .patch(`/api/admin/orders/${orderId}/status`)
-      .send({ status: 'CANCELLED' })
+      .send({ status: 'CANCELLED', reasonCode: 'CUSTOMER_REQUEST' })
       .expect(409);
     expect(shippingCancel.body.error.code).toBe('INVALID_STATUS_TRANSITION');
 
     await admin.patch(`/api/admin/orders/${orderId}/status`).send({ status: 'DELIVERED' }).expect(200);
     const terminal = await admin
       .patch(`/api/admin/orders/${orderId}/status`)
-      .send({ status: 'CANCELLED' })
+      .send({ status: 'CANCELLED', reason: 'Khách đổi ý sau khi giao' })
       .expect(409);
     expect(terminal.body.error.code).toBe('INVALID_STATUS_TRANSITION');
   });

@@ -10,7 +10,8 @@ export type ChatRealtimeEvent =
   | { name: 'message.created'; message: ChatMessage }
   | { name: 'support.requested'; conversation: ChatConversation; message: ChatMessage }
   | { name: 'support.accepted'; conversation: ChatConversation; message: ChatMessage }
-  | { name: 'conversation.closed'; conversation: ChatConversation; message: ChatMessage };
+  | { name: 'conversation.closed'; conversation: ChatConversation; message: ChatMessage }
+  | { name: 'support.transferred'; conversation: ChatConversation; message: ChatMessage };
 
 interface SocketAck {
   ok: boolean;
@@ -125,6 +126,11 @@ export function useChatRealtime({
       'conversation.closed',
       ({ conversation, message }: { conversation: ChatConversation; message: ChatMessage }) =>
         onEventRef.current({ name: 'conversation.closed', conversation, message }),
+    );
+    socket.on(
+      'support.transferred',
+      ({ conversation, message }: { conversation: ChatConversation; message: ChatMessage }) =>
+        onEventRef.current({ name: 'support.transferred', conversation, message }),
     );
     socket.connect();
 

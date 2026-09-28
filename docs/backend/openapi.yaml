@@ -12,6 +12,7 @@ components:
     accessCookie: { type: apiKey, in: cookie, name: access_token }
   schemas:
     OrderStatus: { type: string, enum: [PENDING, CONFIRMED, SHIPPING, DELIVERED, CANCELLED] }
+    AdminCancelReasonCode: { type: string, enum: [CUSTOMER_REQUEST, OUT_OF_STOCK, UNREACHABLE, INVALID_ADDRESS, PAYMENT_ISSUE, OTHER] }
     PaymentStatus: { type: string, enum: [UNPAID, PAID, FAILED] }
     PaymentMethod: { type: string, enum: [COD, MOMO] }
     Role: { type: string, enum: [USER, STAFF, ADMIN] }
@@ -56,6 +57,56 @@ components:
               oneOf:
                 - $ref: '#/components/schemas/ConversationParticipant'
                 - type: 'null'
+    SupportCategory: { type: string, enum: [DON_HANG, SAN_PHAM, GIAO_HANG, THANH_TOAN, DOI_TRA, TAI_KHOAN, KHAC] }
+    SupportClassification:
+      type: object
+      required: [category, label]
+      properties:
+        category: { $ref: '#/components/schemas/SupportCategory' }
+        label: { type: string }
+    SupportNote:
+      type: object
+      required: [id, content, createdAt, author]
+      properties:
+        id: { type: integer }
+        content: { type: string }
+        createdAt: { type: string, format: date-time }
+        author:
+          oneOf:
+            - $ref: '#/components/schemas/ConversationParticipant'
+            - type: 'null'
+    SupportCustomerAddress:
+      type: object
+      required: [fullName, phone, line1, ward, district, province]
+      properties:
+        fullName: { type: string }
+        phone: { type: string }
+        line1: { type: string }
+        ward: { type: string }
+        district: { type: string }
+        province: { type: string }
+    SupportCustomerOrder:
+      type: object
+      required: [id, code, status, total, createdAt]
+      properties:
+        id: { type: integer }
+        code: { type: string }
+        status: { $ref: '#/components/schemas/OrderStatus' }
+        total: { type: integer }
+        createdAt: { type: string, format: date-time }
+    SupportCustomer:
+      type: object
+      required: [id, email, fullName, phone, address, orders]
+      properties:
+        id: { type: integer }
+        email: { type: string, format: email }
+        fullName: { type: string }
+        phone: { type: [string, 'null'] }
+        address:
+          oneOf:
+            - $ref: '#/components/schemas/SupportCustomerAddress'
+            - type: 'null'
+        orders: { type: array, items: { $ref: '#/components/schemas/SupportCustomerOrder' } }
     CustomerConversationItem:
       allOf:
         - $ref: '#/components/schemas/Conversation'
@@ -566,7 +617,7 @@ paths:
   /admin/chat/conversations:
     get:
       operationId: listAdminChatConversations
-      parameters: [{ name: status, in: query, schema: { $ref: '#/components/schemas/ConversationStatus' } }, { name: page, in: query, schema: { type: integer } }, { name: limit, in: query, schema: { type: integer } }]
+      parameters: [{ name: status, in: query, schema: { $ref: '#/components/schemas/ConversationStatus' } }, { name: q, in: query, schema: { type: string } }, { name: page, in: query, schema: { type: integer } }, { name: limit, in: query, schema: { type: integer } }]
       responses:
         '200': { description: Support queue page, content: { application/json: { schema: { type: object, required: [items, pagination], properties: { items: { type: array, items: { $ref: '#/components/schemas/AdminConversation' } }, pagination: { $ref: '#/components/schemas/Pagination' } } } } } }
   /admin/chat/conversations/{id}:
@@ -574,7 +625,7 @@ paths:
       operationId: getAdminChatConversation
       parameters: [{ name: id, in: path, required: true, schema: { type: integer } }, { name: page, in: query, schema: { type: integer } }, { name: limit, in: query, schema: { type: integer } }]
       responses:
-        '200': { description: Conversation detail and message page, content: { application/json: { schema: { type: object, required: [conversation, messages, pagination], properties: { conversation: { $ref: '#/components/schemas/AdminConversation' }, messages: { type: array, items: { $ref: '#/components/schemas/ChatMessage' } }, pagination: { $ref: '#/components/schemas/Pagination' } } } } } }
+        '200': { description: Conversation detail, exchange history, notes and customer profile, content: { application/json: { schema: { type: object, required: [conversation, messages, notes, classification, customer, pagination], properties: { conversation: { $ref: '#/components/schemas/AdminConversation' }, messages: { type: array, items: { $ref: '#/components/schemas/ChatMessage' } }, notes: { type: array, items: { $ref: '#/components/schemas/SupportNote' } }, classification: { oneOf: [{ $ref: '#/components/schemas/SupportClassification' }, { type: 'null' }] }, customer: { $ref: '#/components/schemas/SupportCustomer' }, pagination: { $ref: '#/components/schemas/Pagination' } } } } } }
   /admin/chat/conversations/{id}/accept:
     post:
       operationId: acceptAdminChatConversation
@@ -593,7 +644,33 @@ paths:
       operationId: closeAdminChatConversation
       parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
       responses:
-        '200': { description: Conversation closed or idempotently replayed, content: { application/json: { schema: { type: object, required: [conversation, message], properties: { conversation: { $ref: '#/components/schemas/Conversation' }, message: { $ref: '#/components/schemas/ChatMessage' } } } } } }
+        '200': { description: Conversation marked processed or idempotently replayed, content: { application/json: { schema: { type: object, required: [conversation, message], properties: { conversation: { $ref: '#/components/schemas/Conversation' }, message: { $ref: '#/components/schemas/ChatMessage' } } } } } }
+  /admin/chat/conversations/{id}/category:
+    post:
+      operationId: classifyAdminChatConversation
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [category], properties: { category: { $ref: '#/components/schemas/SupportCategory' } } } } } }
+      responses:
+        '200': { description: Support request classified, content: { application/json: { schema: { type: object, required: [conversation, message, classification], properties: { conversation: { $ref: '#/components/schemas/Conversation' }, message: { $ref: '#/components/schemas/ChatMessage' }, classification: { $ref: '#/components/schemas/SupportClassification' } } } } } }
+  /admin/chat/conversations/{id}/notes:
+    post:
+      operationId: addAdminChatNote
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [content], properties: { content: { type: string } } } } } }
+      responses:
+        '201': { description: Staff-only note stored, content: { application/json: { schema: { type: object, required: [note], properties: { note: { $ref: '#/components/schemas/SupportNote' } } } } } }
+  /admin/chat/conversations/{id}/transfer:
+    post:
+      operationId: transferAdminChatConversation
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [assigneeId], properties: { assigneeId: { type: integer } } } } } }
+      responses:
+        '200': { description: Live conversation transferred to another support agent, content: { application/json: { schema: { type: object, required: [conversation, message], properties: { conversation: { $ref: '#/components/schemas/Conversation' }, message: { $ref: '#/components/schemas/ChatMessage' } } } } } }
+  /admin/chat/agents:
+    get:
+      operationId: listAdminChatAgents
+      responses:
+        '200': { description: Support agents eligible to receive a conversation, content: { application/json: { schema: { type: object, required: [agents], properties: { agents: { type: array, items: { $ref: '#/components/schemas/ConversationParticipant' } } } } } } }
   /admin/stats:
     get:
       operationId: getAdminStats
@@ -736,7 +813,7 @@ paths:
     patch:
       operationId: updateAdminOrderStatus
       parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
-      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [status], properties: { status: { $ref: '#/components/schemas/OrderStatus' } } } } } }
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [status], properties: { status: { $ref: '#/components/schemas/OrderStatus' }, reasonCode: { $ref: '#/components/schemas/AdminCancelReasonCode' }, reason: { type: string, maxLength: 500 } } } } } }
       responses: { '200': { description: Status updated, content: { application/json: { schema: { type: object, required: [order, replayed], properties: { order: { $ref: '#/components/schemas/Order' }, replayed: { type: boolean } } } } } } }
   /admin/orders/{id}/payment-status:
     patch:
@@ -788,6 +865,18 @@ paths:
       parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
       requestBody: { required: true, content: { application/json: { schema: { type: object, required: [role], properties: { role: { type: string, enum: [USER, ADMIN] } } } } } }
       responses: { '200': { description: Role updated, content: { application/json: { schema: { type: object, required: [user], properties: { user: { $ref: '#/components/schemas/AdminUser' } } } } } } }
+  /admin/users/{id}/profile:
+    patch:
+      operationId: updateAdminStaffProfile
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [fullName, email, phone], properties: { fullName: { type: string }, email: { type: string, format: email }, phone: { type: [string, 'null'] } } } } } }
+      responses: { '200': { description: Staff profile updated, content: { application/json: { schema: { type: object, required: [user], properties: { user: { $ref: '#/components/schemas/AdminUser' } } } } } } }
+  /admin/users/{id}/reset-password:
+    post:
+      operationId: resetAdminStaffPassword
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [password], properties: { password: { type: string, minLength: 8, maxLength: 72 } } } } } }
+      responses: { '200': { description: Staff password reset and sessions revoked, content: { application/json: { schema: { type: object, required: [reset], properties: { reset: { type: boolean } } } } } } }
   /admin/users/{id}/revoke-sessions:
     post:
       operationId: revokeAdminUserSessions

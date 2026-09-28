@@ -405,4 +405,85 @@ Hy vọng thông tin này giúp ích cho bạn!`,
     expect(aiMessage.content).toBe('Chào bạn, áo thun bên mình có size từ S đến XL.');
     expect(aiMessage.metadata.suggestions).toEqual(['Xem bảng size', 'Tư vấn thêm']);
   });
+
+  test('support agent searches, classifies, notes, and transfers a conversation', async () => {
+    const { customer, admin } = await seedUsers();
+    await createUser({
+      email: 'admin2@test.local',
+      password: 'Admin2@12345',
+      role: 'ADMIN',
+      fullName: 'Nhân viên hai',
+    });
+    const admin2 = await loginAs('admin2@test.local', 'Admin2@12345');
+    const secondAdmin = await userIdByEmail('admin2@test.local');
+    const conversation = (await customer.post('/api/chat/conversations').expect(201)).body
+      .conversation;
+    await customer.post(`/api/chat/conversations/${conversation.id}/request-admin`).expect(200);
+
+    const found = await admin
+      .get('/api/admin/chat/conversations?status=WAITING_ADMIN&q=Khách thử&page=1&limit=10')
+      .expect(200);
+    expect(found.body.items.map((item: { id: number }) => item.id)).toContain(conversation.id);
+    const missed = await admin
+      .get('/api/admin/chat/conversations?status=WAITING_ADMIN&q=không-có-khách&page=1&limit=10')
+      .expect(200);
+    expect(missed.body.items).toEqual([]);
+
+    await admin.post(`/api/admin/chat/conversations/${conversation.id}/accept`).expect(200);
+    await admin2
+      .post(`/api/admin/chat/conversations/${conversation.id}/category`)
+      .send({ category: 'DON_HANG' })
+      .expect(403);
+
+    const classified = await admin
+      .post(`/api/admin/chat/conversations/${conversation.id}/category`)
+      .send({ category: 'DON_HANG' })
+      .expect(200);
+    expect(classified.body.classification).toEqual({ category: 'DON_HANG', label: 'Đơn hàng' });
+
+    await admin
+      .post(`/api/admin/chat/conversations/${conversation.id}/notes`)
+      .send({ content: 'Khách cần kiểm tra đơn mới nhất.' })
+      .expect(201);
+
+    const customerHistory = await customer
+      .get(`/api/chat/conversations/${conversation.id}/messages?page=1&limit=20`)
+      .expect(200);
+    expect(
+      customerHistory.body.messages.some((message: { content: string }) =>
+        message.content.includes('Khách cần kiểm tra đơn'),
+      ),
+    ).toBe(false);
+
+    const detail = await admin
+      .get(`/api/admin/chat/conversations/${conversation.id}?page=1&limit=20`)
+      .expect(200);
+    expect(detail.body.classification.label).toBe('Đơn hàng');
+    expect(detail.body.customer.fullName).toBe('Khách thử');
+    expect(detail.body.notes.map((note: { content: string }) => note.content)).toEqual([
+      'Khách cần kiểm tra đơn mới nhất.',
+    ]);
+    expect(
+      detail.body.messages.some((message: { content: string }) =>
+        message.content.includes('Khách cần kiểm tra đơn'),
+      ),
+    ).toBe(false);
+
+    await admin
+      .post(`/api/admin/chat/conversations/${conversation.id}/transfer`)
+      .send({ assigneeId: secondAdmin.id })
+      .expect(200);
+    await admin
+      .post(`/api/admin/chat/conversations/${conversation.id}/messages`)
+      .send({ content: 'Mình không còn phụ trách.' })
+      .expect(403);
+    await admin2
+      .post(`/api/admin/chat/conversations/${conversation.id}/messages`)
+      .send({ content: 'Mình nhận cuộc trò chuyện này.' })
+      .expect(201);
+    const processed = await admin2
+      .post(`/api/admin/chat/conversations/${conversation.id}/close`)
+      .expect(200);
+    expect(processed.body.conversation.status).toBe('CLOSED');
+  });
 });

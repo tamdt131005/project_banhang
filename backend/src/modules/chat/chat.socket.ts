@@ -7,6 +7,7 @@ import { ACCESS_COOKIE } from '../../lib/cookies.js';
 import { verifyAccessToken } from '../../lib/jwt.js';
 import { prisma } from '../../lib/prisma.js';
 import { AppError } from '../../middleware/error.js';
+import { messageMetadataKind, STAFF_NOTE_KIND } from './chat.constants.js';
 import { chatEvents } from './chat.events.js';
 import { hasAdminAccess, userHasPermission } from '../permissions/permission.service.js';
 
@@ -98,6 +99,10 @@ export function attachChatSocket(httpServer: HttpServer) {
       io.to(`conversation:${payload.conversation.id}`).emit('conversation.created', payload);
     }),
     chatEvents.subscribe('message.created', (payload) => {
+      if (messageMetadataKind(payload.message.metadata) === STAFF_NOTE_KIND) {
+        io.to('support:admins').emit('message.created', payload);
+        return;
+      }
       io.to(`conversation:${payload.message.conversationId}`).emit('message.created', payload);
     }),
     chatEvents.subscribe('support.requested', (payload) => {
@@ -111,6 +116,10 @@ export function attachChatSocket(httpServer: HttpServer) {
     chatEvents.subscribe('conversation.closed', (payload) => {
       io.to('support:admins').emit('conversation.closed', payload);
       io.to(`conversation:${payload.conversation.id}`).emit('conversation.closed', payload);
+    }),
+    chatEvents.subscribe('support.transferred', (payload) => {
+      io.to('support:admins').emit('support.transferred', payload);
+      io.to(`conversation:${payload.conversation.id}`).emit('support.transferred', payload);
     }),
   ];
   httpServer.once('close', () => {

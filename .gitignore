@@ -40,3 +40,6 @@ Thumbs.db
 .vscode/*
 !.vscode/extensions.json
 .tmp/
+Website bán hàng.drawio
+.*.bkp
+/docs/

@@ -1,12 +1,16 @@
 import type { RequestHandler } from 'express';
 import { idParamSchema } from '../../lib/validators.js';
 import {
+  ADMIN_CANCEL_REASON_LABEL,
+  CUSTOMER_CANCEL_REASON_LABEL,
   adminOrderListQuerySchema,
+  customerCancelSchema,
   orderCodeParamSchema,
   orderCreateSchema,
   orderListQuerySchema,
   orderStatusSchema,
   paymentStatusSchema,
+  resolveCancelReason,
 } from './order.schema.js';
 import * as orderService from './order.service.js';
 
@@ -30,7 +34,9 @@ export const detailMineHandler: RequestHandler = async (req, res) => {
 
 export const cancelHandler: RequestHandler = async (req, res) => {
   const { code } = orderCodeParamSchema.parse(req.params);
-  const result = await orderService.cancelMyOrder(req.user!.id, code);
+  const input = customerCancelSchema.parse(req.body);
+  const reason = resolveCancelReason(input, CUSTOMER_CANCEL_REASON_LABEL);
+  const result = await orderService.cancelMyOrder(req.user!.id, code, reason);
   res.json(result);
 };
 
@@ -50,8 +56,12 @@ export const adminDetailHandler: RequestHandler = async (req, res) => {
 
 export const adminUpdateStatusHandler: RequestHandler = async (req, res) => {
   const { id } = idParamSchema.parse(req.params);
-  const { status } = orderStatusSchema.parse(req.body);
-  const result = await orderService.updateOrderStatus(id, status, req.user!.id);
+  const input = orderStatusSchema.parse(req.body);
+  const reason =
+    input.status === 'CANCELLED'
+      ? resolveCancelReason(input, ADMIN_CANCEL_REASON_LABEL)
+      : undefined;
+  const result = await orderService.updateOrderStatus(id, input.status, req.user!.id, reason);
   res.json(result);
 };
 

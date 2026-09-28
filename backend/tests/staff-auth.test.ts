@@ -64,4 +64,39 @@ describe('tài khoản nhân viên', () => {
     await request(app).post('/api/auth/login')
       .send({ email: STAFF.email, password: 'Changed@123' }).expect(200);
   });
+
+  it('chủ shop cập nhật hồ sơ và đặt lại mật khẩu nhân viên', async () => {
+    const { customer, admin } = await seedUsers();
+    const created = await admin.post('/api/admin/users/staff').send(STAFF).expect(201);
+    const staffId = created.body.user.id as number;
+
+    await customer
+      .patch(`/api/admin/users/${staffId}/profile`)
+      .send({ fullName: 'Tên mới', email: 'staff@test.local', phone: null })
+      .expect(403);
+
+    const updated = await admin
+      .patch(`/api/admin/users/${staffId}/profile`)
+      .send({ fullName: 'Tên mới', email: 'nhanvien.moi@test.local', phone: '0901234567' })
+      .expect(200);
+    expect(updated.body.user).toMatchObject({
+      fullName: 'Tên mới',
+      email: 'nhanvien.moi@test.local',
+      phone: '0901234567',
+      role: 'STAFF',
+    });
+
+    await admin
+      .post(`/api/admin/users/${staffId}/reset-password`)
+      .send({ password: 'Reset@12345' })
+      .expect(200);
+    await request(app)
+      .post('/api/auth/login')
+      .send({ email: 'nhanvien.moi@test.local', password: STAFF.password })
+      .expect(401);
+    await request(app)
+      .post('/api/auth/login')
+      .send({ email: 'nhanvien.moi@test.local', password: 'Reset@12345' })
+      .expect(200);
+  });
 });

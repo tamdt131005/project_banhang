@@ -77,12 +77,18 @@ const adminPaths = {
   staff: '/admin/users/staff',
   userRole: '/admin/users/{id}/role',
   userAccess: '/admin/users/{id}/access',
+  userProfile: '/admin/users/{id}/profile',
+  userResetPassword: '/admin/users/{id}/reset-password',
   revokeSessions: '/admin/users/{id}/revoke-sessions',
   chatConversations: '/admin/chat/conversations',
   chatConversation: '/admin/chat/conversations/{id}',
   chatAccept: '/admin/chat/conversations/{id}/accept',
   chatMessages: '/admin/chat/conversations/{id}/messages',
   chatClose: '/admin/chat/conversations/{id}/close',
+  chatCategory: '/admin/chat/conversations/{id}/category',
+  chatNotes: '/admin/chat/conversations/{id}/notes',
+  chatTransfer: '/admin/chat/conversations/{id}/transfer',
+  chatAgents: '/admin/chat/agents',
 } as const satisfies Record<string, AdminContractPath>;
 
 function bindPath(template: AdminContractPath, parameter: string | number): string {
@@ -201,6 +207,12 @@ export interface CreateStaffInput {
   permissions: AdminPermission[];
 }
 
+export interface UpdateStaffProfileInput {
+  fullName: string;
+  email: string;
+  phone: string | null;
+}
+
 export interface AdminUserDetail extends AdminUser {
   updatedAt: string;
   addresses: ApiAddress[];
@@ -222,8 +234,11 @@ export type AdminChatStatus = components['schemas']['ConversationStatus'];
 export type AdminChatDetailResponse = JsonResponse<'/admin/chat/conversations/{id}', 'get', 200>;
 export type AdminChatMessageResponse = JsonResponse<'/admin/chat/conversations/{id}/messages', 'post', 201>;
 
+export type SupportCategory = components['schemas']['SupportCategory'];
+
 export interface AdminChatQuery {
   status: AdminChatStatus;
+  q?: string;
   page?: number;
   limit?: number;
 }
@@ -475,8 +490,23 @@ const adminApi = {
   order: (code: string) =>
     api.get<JsonResponse<'/admin/orders/{code}', 'get', 200>>(`/api${bindPath(adminPaths.order, code)}`),
 
-  setOrderStatus: (id: number, status: OrderStatus) => {
-    const body = { status } satisfies JsonRequestBody<'/admin/orders/{id}/status', 'patch'>;
+  setOrderStatus: (
+    id: number,
+    status: OrderStatus,
+    cancelReason?: { reasonCode: string; reason?: string },
+  ) => {
+    const body = (
+      cancelReason
+        ? {
+            status,
+            reasonCode: cancelReason.reasonCode as JsonRequestBody<
+              '/admin/orders/{id}/status',
+              'patch'
+            >['reasonCode'],
+            ...(cancelReason.reason === undefined ? {} : { reason: cancelReason.reason }),
+          }
+        : { status }
+    ) satisfies JsonRequestBody<'/admin/orders/{id}/status', 'patch'>;
     return api.patch<JsonResponse<'/admin/orders/{id}/status', 'patch', 200>>(`/api${bindPath(adminPaths.orderStatus, id)}`, body);
   },
 
@@ -522,12 +552,29 @@ const adminApi = {
     );
   },
 
+  updateStaffProfile: (id: number, input: UpdateStaffProfileInput) => {
+    const body = input satisfies JsonRequestBody<'/admin/users/{id}/profile', 'patch'>;
+    return api.patch<JsonResponse<'/admin/users/{id}/profile', 'patch', 200>>(
+      `/api${bindPath(adminPaths.userProfile, id)}`,
+      body,
+    );
+  },
+
+  resetStaffPassword: (id: number, password: string) => {
+    const body = { password } satisfies JsonRequestBody<'/admin/users/{id}/reset-password', 'post'>;
+    return api.post<JsonResponse<'/admin/users/{id}/reset-password', 'post', 200>>(
+      `/api${bindPath(adminPaths.userResetPassword, id)}`,
+      body,
+    );
+  },
+
   revokeSessions: (id: number) =>
     api.post<JsonResponse<'/admin/users/{id}/revoke-sessions', 'post', 200>>(`/api${bindPath(adminPaths.revokeSessions, id)}`),
 
   chatConversations: (query: AdminChatQuery) => {
     const contractQuery = {
       status: query.status,
+      q: query.q,
       page: query.page,
       limit: query.limit,
     } satisfies ContractQuery<'/admin/chat/conversations', 'get'>;
@@ -562,6 +609,33 @@ const adminApi = {
     api.post<JsonResponse<'/admin/chat/conversations/{id}/close', 'post', 200>>(
       `/api${bindPath(adminPaths.chatClose, conversationId)}`,
     ),
+
+  classifyChatConversation: (conversationId: number, category: SupportCategory) => {
+    const body = { category } satisfies JsonRequestBody<'/admin/chat/conversations/{id}/category', 'post'>;
+    return api.post<JsonResponse<'/admin/chat/conversations/{id}/category', 'post', 200>>(
+      `/api${bindPath(adminPaths.chatCategory, conversationId)}`,
+      body,
+    );
+  },
+
+  addChatNote: (conversationId: number, content: string) => {
+    const body = { content } satisfies JsonRequestBody<'/admin/chat/conversations/{id}/notes', 'post'>;
+    return api.post<JsonResponse<'/admin/chat/conversations/{id}/notes', 'post', 201>>(
+      `/api${bindPath(adminPaths.chatNotes, conversationId)}`,
+      body,
+    );
+  },
+
+  transferChatConversation: (conversationId: number, assigneeId: number) => {
+    const body = { assigneeId } satisfies JsonRequestBody<'/admin/chat/conversations/{id}/transfer', 'post'>;
+    return api.post<JsonResponse<'/admin/chat/conversations/{id}/transfer', 'post', 200>>(
+      `/api${bindPath(adminPaths.chatTransfer, conversationId)}`,
+      body,
+    );
+  },
+
+  chatAgents: () =>
+    api.get<JsonResponse<'/admin/chat/agents', 'get', 200>>(`/api${adminPaths.chatAgents}`),
 };
 
 interface AdminGateway {
@@ -597,7 +671,11 @@ interface AdminGateway {
   orders: {
     list(query?: AdminOrderQuery): Promise<ApiPaged<AdminOrder>>;
     detail(code: string): Promise<{ order: AdminOrder }>;
-    setStatus(id: number, status: OrderStatus): Promise<{ order: ApiOrder; replayed?: boolean }>;
+    setStatus(
+      id: number,
+      status: OrderStatus,
+      cancelReason?: { reasonCode: string; reason?: string },
+    ): Promise<{ order: ApiOrder; replayed?: boolean }>;
     setPaymentStatus(id: number, paymentStatus: 'UNPAID' | 'PAID' | 'FAILED'): Promise<{ order: AdminOrder }>;
   };
   users: {
@@ -607,6 +685,8 @@ interface AdminGateway {
     setRole(id: number, role: 'USER' | 'ADMIN'): Promise<{ user: AdminUser }>;
     access(id: number): Promise<JsonResponse<'/admin/users/{id}/access', 'get', 200>>;
     setAccess(id: number, input: { permissions: AdminPermission[] }): Promise<JsonResponse<'/admin/users/{id}/access', 'patch', 200>>;
+    updateProfile(id: number, input: UpdateStaffProfileInput): Promise<JsonResponse<'/admin/users/{id}/profile', 'patch', 200>>;
+    resetPassword(id: number, password: string): Promise<JsonResponse<'/admin/users/{id}/reset-password', 'post', 200>>;
     revokeSessions(id: number): Promise<{ revoked: number }>;
   };
   chat: {
@@ -615,6 +695,10 @@ interface AdminGateway {
     accept(conversationId: number): Promise<JsonResponse<'/admin/chat/conversations/{id}/accept', 'post', 200>>;
     send(conversationId: number, content: string): Promise<AdminChatMessageResponse>;
     close(conversationId: number): Promise<JsonResponse<'/admin/chat/conversations/{id}/close', 'post', 200>>;
+    classify(conversationId: number, category: SupportCategory): Promise<JsonResponse<'/admin/chat/conversations/{id}/category', 'post', 200>>;
+    note(conversationId: number, content: string): Promise<JsonResponse<'/admin/chat/conversations/{id}/notes', 'post', 201>>;
+    transfer(conversationId: number, assigneeId: number): Promise<JsonResponse<'/admin/chat/conversations/{id}/transfer', 'post', 200>>;
+    agents(): Promise<JsonResponse<'/admin/chat/agents', 'get', 200>>;
   };
 }
 
@@ -634,13 +718,17 @@ export const adminGateway: AdminGateway = {
   categories: { list: adminApi.categories, create: adminApi.createCategory, update: adminApi.updateCategory, remove: adminApi.removeCategory },
   banners: { list: adminApi.banners, create: adminApi.createBanner, update: adminApi.updateBanner, setActive: adminApi.setBannerActive, replaceImage: adminApi.replaceBannerImage },
   orders: { list: adminApi.orders, detail: adminApi.order, setStatus: adminApi.setOrderStatus, setPaymentStatus: adminApi.setPaymentStatus },
-  users: { list: adminApi.users, createStaff: adminApi.createStaff, detail: adminApi.user, setRole: adminApi.setUserRole, access: adminApi.userAccess, setAccess: adminApi.setUserAccess, revokeSessions: adminApi.revokeSessions },
+  users: { list: adminApi.users, createStaff: adminApi.createStaff, detail: adminApi.user, setRole: adminApi.setUserRole, access: adminApi.userAccess, setAccess: adminApi.setUserAccess, updateProfile: adminApi.updateStaffProfile, resetPassword: adminApi.resetStaffPassword, revokeSessions: adminApi.revokeSessions },
   chat: {
     list: adminApi.chatConversations,
     detail: adminApi.chatConversation,
     accept: adminApi.acceptChatConversation,
     send: adminApi.sendChatMessage,
     close: adminApi.closeChatConversation,
+    classify: adminApi.classifyChatConversation,
+    note: adminApi.addChatNote,
+    transfer: adminApi.transferChatConversation,
+    agents: adminApi.chatAgents,
   },
 } as const;
 
