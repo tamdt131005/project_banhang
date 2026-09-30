@@ -1,3 +1,6 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { hashPassword } from '../src/lib/password.js';
 import { prisma } from '../src/lib/prisma.js';
 
@@ -385,14 +388,31 @@ const PRODUCTS: SeedProduct[] = [
   },
 ];
 
+const SEED_IMAGE_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), 'seed-images');
+
 /**
- * Ảnh minh hoạ ổn định theo slug — cùng slug luôn ra cùng một ảnh.
- * Khung DỌC 4:5 theo DESIGN.md: thẻ sản phẩm quần áo dùng ảnh đứng.
+ * Ảnh sản phẩm nằm trong prisma/seed-images (WebP 4:5, đã tải từ Unsplash /
+ * Wikimedia). Seed chép sang uploads/seed để backend phục vụ đúng đường
+ * /uploads/... như ảnh admin tải lên.
  */
+function publishSeedImages() {
+  const target = path.resolve(process.cwd(), 'uploads', 'seed');
+  fs.mkdirSync(target, { recursive: true });
+  for (const file of fs.readdirSync(SEED_IMAGE_DIR)) {
+    if (!file.endsWith('.webp')) continue;
+    fs.copyFileSync(path.join(SEED_IMAGE_DIR, file), path.join(target, file));
+  }
+}
+
 function imageFor(slug: string) {
+  const full = path.join(SEED_IMAGE_DIR, `${slug}.webp`);
+  const thumb = path.join(SEED_IMAGE_DIR, `${slug}-thumb.webp`);
+  if (!fs.existsSync(full) || !fs.existsSync(thumb)) {
+    throw new Error(`Thiếu ảnh seed cho "${slug}" trong prisma/seed-images`);
+  }
   return {
-    url: `https://picsum.photos/seed/${slug}/800/1000`,
-    thumbUrl: `https://picsum.photos/seed/${slug}/400/500`,
+    url: `/uploads/seed/${slug}.webp`,
+    thumbUrl: `/uploads/seed/${slug}-thumb.webp`,
   };
 }
 
@@ -504,6 +524,7 @@ async function seedProducts(categoryIdBySlug: Map<string, number>) {
 async function main() {
   console.log('Đang tạo dữ liệu mẫu cho tiệm quần áo...');
 
+  publishSeedImages();
   await seedUsers();
   const categoryIdBySlug = await seedCategories();
   await seedProducts(categoryIdBySlug);
