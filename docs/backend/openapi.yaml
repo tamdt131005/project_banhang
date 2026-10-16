@@ -614,6 +614,32 @@ paths:
       parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
       responses:
         '200': { description: Customer conversation closed or idempotently replayed, content: { application/json: { schema: { type: object, required: [conversation, message], properties: { conversation: { $ref: '#/components/schemas/Conversation' }, message: { $ref: '#/components/schemas/ChatMessage' } } } } } }
+  /orders/{code}/momo:
+    post:
+      operationId: startMomoPayment
+      description: Create a new MoMo payment attempt for the customer's own unpaid MOMO order (PENDING or CONFIRMED). 501 when MoMo is not configured; 502 when MoMo rejects or is unreachable.
+      parameters: [{ name: code, in: path, required: true, schema: { type: string } }]
+      responses:
+        '200': { description: MoMo payment page URL, content: { application/json: { schema: { type: object, required: [paymentUrl], properties: { paymentUrl: { type: string, format: uri } } } } } }
+        '409': { $ref: '#/components/responses/Error' }
+  /orders/{code}/momo/verify:
+    post:
+      operationId: verifyMomoPayment
+      description: Called by the MoMo return page. The server queries MoMo for the transaction instead of trusting redirect parameters, then updates paymentStatus (never downgrades PAID).
+      parameters: [{ name: code, in: path, required: true, schema: { type: string } }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [momoOrderId], properties: { momoOrderId: { type: string, maxLength: 200 } } } } } }
+      responses:
+        '200': { description: Current order and MoMo outcome, content: { application/json: { schema: { type: object, required: [order, outcome, message], properties: { order: { $ref: '#/components/schemas/Order' }, outcome: { type: string, enum: [PAID, PENDING, FAILED, UNKNOWN] }, message: { type: string } } } } } }
+        '400': { $ref: '#/components/responses/Error' }
+  /payments/momo/ipn:
+    post:
+      security: []
+      operationId: receiveMomoIpn
+      description: Server-to-server MoMo IPN. Authenticated only by the HMAC-SHA256 signature over the documented field order.
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [partnerCode, orderId, requestId, amount, transId, resultCode, responseTime, signature], additionalProperties: true } } } }
+      responses:
+        '204': { description: Notification accepted }
+        '400': { $ref: '#/components/responses/Error' }
   /admin/chat/conversations:
     get:
       operationId: listAdminChatConversations

@@ -5,8 +5,8 @@ export interface AuthShellProps {
   /** Tiêu đề lớn bằng font serif — "Chào mừng trở lại", "Tạo tài khoản"... */
   title: string;
   subtitle: string;
-  /** Seed ảnh picsum cho nửa phải, mỗi trang một ảnh ổn định. */
-  imageSeed: string;
+  /** Ảnh thời trang cho nửa phải, nằm trong frontend/public/images. */
+  imageUrl: string;
   children: ReactNode;
 }
 
@@ -15,7 +15,7 @@ export interface AuthShellProps {
  * trái là form trên nền phẳng, phải là ảnh thời trang tràn mép với câu dẫn
  * serif. Ảnh ẩn dưới lg — di động chỉ còn form, không tải ảnh thừa.
  */
-export function AuthShell({ title, subtitle, imageSeed, children }: Readonly<AuthShellProps>) {
+export function AuthShell({ title, subtitle, imageUrl, children }: Readonly<AuthShellProps>) {
   return (
     <div className="grid min-h-[calc(100dvh-4rem)] lg:grid-cols-2">
       <div className="flex items-center justify-center px-4 py-12 md:px-10">
@@ -33,7 +33,7 @@ export function AuthShell({ title, subtitle, imageSeed, children }: Readonly<Aut
 
       <div className="relative hidden bg-sunken lg:block">
         <img
-          src={`https://picsum.photos/seed/${imageSeed}/1080/1350`}
+          src={imageUrl}
           alt=""
           decoding="async"
           className="absolute inset-0 size-full object-cover"

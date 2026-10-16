@@ -20,7 +20,7 @@ export interface PaymentProvider {
   readonly method: PaymentMethod;
 
   /**
-   * false khi cổng chưa đấu nối. Nghiệp vụ đặt hàng phải kiểm tra cờ này
+   * false khi cổng chưa được cấu hình. Nghiệp vụ đặt hàng phải kiểm tra cờ này
    * TRƯỚC khi ghi gì xuống database: phát hiện muộn thì đơn đã tạo và tồn kho
    * đã bị trừ trong khi khách không có cách nào trả tiền.
    */

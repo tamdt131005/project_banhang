@@ -11,6 +11,17 @@ export interface CreateOrderInput {
   buyNow?: { variantId: number; quantity: number };
 }
 
+export interface CreateOrderResult {
+  order: ApiOrder;
+  /** Có với cổng online (MoMo): chuyển khách tới đây để thanh toán. */
+  paymentUrl?: string;
+  /** Đơn đã tạo nhưng chưa mở được cổng thanh toán; khách thanh toán lại ở trang đơn. */
+  paymentError?: string;
+}
+
+/** Khớp MomoOutcome trong backend/src/payments/momo.ts. */
+export type MomoOutcome = 'PAID' | 'PENDING' | 'FAILED' | 'UNKNOWN';
+
 export interface OrderListQuery {
   status?: OrderStatus;
   page?: number;
@@ -18,7 +29,16 @@ export interface OrderListQuery {
 }
 
 export const orderApi = {
-  create: (input: CreateOrderInput) => api.post<{ order: ApiOrder }>('/api/orders', input),
+  create: (input: CreateOrderInput) => api.post<CreateOrderResult>('/api/orders', input),
+
+  payMomo: (code: string) =>
+    api.post<{ paymentUrl: string }>(`/api/orders/${encodeURIComponent(code)}/momo`),
+
+  verifyMomo: (code: string, momoOrderId: string) =>
+    api.post<{ order: ApiOrder; outcome: MomoOutcome; message: string }>(
+      `/api/orders/${encodeURIComponent(code)}/momo/verify`,
+      { momoOrderId },
+    ),
 
   listMine: (query: OrderListQuery = {}) => api.get<ApiPaged<ApiOrder>>('/api/orders', { ...query }),
 

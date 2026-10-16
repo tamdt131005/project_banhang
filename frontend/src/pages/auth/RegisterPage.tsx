@@ -88,7 +88,7 @@ export function RegisterPage() {
     <AuthShell
       title="Tạo tài khoản"
       subtitle="Đăng ký để lưu giỏ hàng, quản lý địa chỉ giao và theo dõi đơn."
-      imageSeed="tamdang-dang-ky"
+      imageUrl="/images/auth-dang-ky.webp"
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         {message ? <Alert tone={messageTone}>{message}</Alert> : null}

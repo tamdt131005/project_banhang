@@ -82,9 +82,9 @@ export function HomePage({}: Readonly<HomePageProps>) {
 
   // Cổng vào theo đối tượng (chuẩn Canifa/H&M) — ảnh lớn tạo mảng thị giác.
   const gateways = [
-    { label: 'Đồ nam', to: linkFor('do-nam'), seed: 'tamdang-cong-nam' },
-    { label: 'Đồ nữ', to: linkFor('do-nu'), seed: 'tamdang-cong-nu' },
-    { label: 'Phụ kiện', to: linkFor('phu-kien'), seed: 'tamdang-cong-phu-kien' },
+    { label: 'Đồ nam', to: linkFor('do-nam'), image: '/images/home-do-nam.webp' },
+    { label: 'Đồ nữ', to: linkFor('do-nu'), image: '/images/home-do-nu.webp' },
+    { label: 'Phụ kiện', to: linkFor('phu-kien'), image: '/images/home-phu-kien.webp' },
   ];
 
   return (
@@ -118,7 +118,7 @@ export function HomePage({}: Readonly<HomePageProps>) {
             className="group relative overflow-hidden rounded-card bg-sunken"
           >
             <img
-              src={`https://picsum.photos/seed/${gateway.seed}/600/750`}
+              src={gateway.image}
               alt=""
               loading="lazy"
               decoding="async"

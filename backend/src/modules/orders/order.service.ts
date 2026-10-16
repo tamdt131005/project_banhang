@@ -3,7 +3,18 @@ import { type OrderStatus, type PaymentStatus, Prisma } from '@prisma/client';
 import { env } from '../../config/env.js';
 import { prisma } from '../../lib/prisma.js';
 import { AppError } from '../../middleware/error.js';
-import { getPaymentProvider } from '../../payments/index.js';
+import {
+  getPaymentProvider,
+  type PaymentInitResult,
+  type PaymentOrderInfo,
+} from '../../payments/index.js';
+import {
+  type MomoOutcome,
+  type MomoTransaction,
+  momoOutcome,
+  orderCodeFromMomoOrderId,
+  queryMomoTransaction,
+} from '../../payments/momo.js';
 import { reserveOrderItem, restoreOrderInventory } from '../inventory/inventory.service.js';
 import type { AdminOrderListQuery, OrderCreateInput, OrderListQuery } from './order.schema.js';
 
@@ -228,21 +239,127 @@ export async function createOrder(userId: number, input: OrderCreateInput) {
 
   // Gọi ra ngoài đặt sau transaction: chờ mạng trong transaction sẽ giữ khoá
   // hàng loạt dòng sản phẩm suốt thời gian đó.
-  const payment = await provider.initiate({
+  let payment: PaymentInitResult;
+  try {
+    payment = await provider.initiate(paymentInfoOf(order));
+  } catch (error) {
+    // Đơn và phần giữ hàng đã ghi xong nên không được báo lỗi như thể chưa đặt:
+    // trả đơn về để khách thanh toán lại hoặc tự huỷ ở trang chi tiết đơn.
+    if (error instanceof AppError) return { order, paymentError: error.message };
+    throw error;
+  }
+
+  const result =
+    payment.paymentStatus === order.paymentStatus
+      ? order
+      : await prisma.order.update({
+          where: { id: order.id },
+          data: { paymentStatus: payment.paymentStatus },
+          include: orderDetailInclude,
+        });
+
+  return { order: result, paymentUrl: payment.redirectUrl };
+}
+
+function paymentInfoOf(order: { code: string; total: number }): PaymentOrderInfo {
+  return {
     code: order.code,
     total: order.total,
     description: `Thanh toan don hang ${order.code}`,
-  });
+  };
+}
 
-  if (payment.paymentStatus !== order.paymentStatus) {
-    return prisma.order.update({
-      where: { id: order.id },
-      data: { paymentStatus: payment.paymentStatus },
-      include: orderDetailInclude,
+/** Đơn MoMo còn chờ xử lý hoặc đã xác nhận thì khách vẫn thanh toán (lại) được. */
+const MOMO_PAYABLE_STATUSES: OrderStatus[] = ['PENDING', 'CONFIRMED'];
+
+export async function startMomoPayment(userId: number, code: string) {
+  const order = await getMyOrder(userId, code);
+
+  if (order.paymentMethod !== 'MOMO') {
+    throw AppError.conflict('PAYMENT_METHOD_MISMATCH', 'Đơn hàng này không thanh toán qua MoMo.');
+  }
+  if (order.paymentStatus === 'PAID') {
+    throw AppError.conflict('ORDER_ALREADY_PAID', 'Đơn hàng đã được thanh toán.');
+  }
+  if (!MOMO_PAYABLE_STATUSES.includes(order.status)) {
+    throw AppError.conflict(
+      'ORDER_NOT_PAYABLE',
+      `Đơn hàng ${STATUS_LABEL[order.status]} nên không thể thanh toán.`,
+    );
+  }
+
+  const payment = await getPaymentProvider('MOMO').initiate(paymentInfoOf(order));
+  return { paymentUrl: payment.redirectUrl };
+}
+
+/**
+ * Ghi nhận kết quả giao dịch MoMo đã được xác thực (IPN đúng chữ ký hoặc tự tra
+ * cứu). Cả hai đường có thể tới cùng lúc nên mọi cập nhật đều có điều kiện:
+ * không bao giờ hạ PAID xuống, không đánh dấu PAID cho đơn đã huỷ.
+ */
+export async function applyMomoResult(transaction: MomoTransaction): Promise<MomoOutcome> {
+  const outcome = momoOutcome(transaction.resultCode);
+  const order = await prisma.order.findUnique({
+    where: { code: orderCodeFromMomoOrderId(transaction.orderId) },
+  });
+  if (!order || order.paymentMethod !== 'MOMO') return 'UNKNOWN';
+
+  if (outcome === 'PAID') {
+    if (
+      transaction.partnerCode !== env.MOMO_PARTNER_CODE ||
+      Number(transaction.amount) !== order.total
+    ) {
+      console.error(`[momo] giao dịch ${transaction.orderId} không khớp đơn ${order.code}; bỏ qua.`);
+      return 'UNKNOWN';
+    }
+
+    const claimed = await prisma.order.updateMany({
+      where: { id: order.id, paymentStatus: { not: 'PAID' }, status: { not: 'CANCELLED' } },
+      data: { paymentStatus: 'PAID' },
+    });
+    if (claimed.count === 0 && order.status === 'CANCELLED') {
+      console.error(
+        `[momo] đơn ${order.code} đã huỷ nhưng giao dịch ${transaction.orderId} thanh toán thành công; cần hoàn tiền thủ công.`,
+      );
+    }
+  } else if (outcome === 'FAILED') {
+    await prisma.order.updateMany({
+      where: { id: order.id, paymentStatus: 'UNPAID' },
+      data: { paymentStatus: 'FAILED' },
     });
   }
 
-  return order;
+  return outcome;
+}
+
+/** Trang kết quả gọi sau khi MoMo chuyển khách về; tự tra cứu thay vì tin URL. */
+export async function verifyMomoPayment(userId: number, code: string, momoOrderId: string) {
+  if (orderCodeFromMomoOrderId(momoOrderId) !== code) {
+    throw AppError.badRequest('MOMO_ORDER_MISMATCH', 'Giao dịch MoMo không thuộc đơn hàng này.');
+  }
+
+  const order = await getMyOrder(userId, code);
+  if (order.paymentMethod !== 'MOMO') {
+    throw AppError.conflict('PAYMENT_METHOD_MISMATCH', 'Đơn hàng này không thanh toán qua MoMo.');
+  }
+  if (order.paymentStatus === 'PAID') {
+    return { order, outcome: 'PAID' as MomoOutcome, message: 'Đơn hàng đã được thanh toán.' };
+  }
+  if (!getPaymentProvider('MOMO').implemented) {
+    throw new AppError(
+      501,
+      'PAYMENT_NOT_IMPLEMENTED',
+      'Thanh toán MoMo chưa được cấu hình nên chưa tra cứu được giao dịch.',
+    );
+  }
+
+  const transaction = await queryMomoTransaction(momoOrderId);
+  const outcome = await applyMomoResult(transaction);
+  return {
+    order: await getMyOrder(userId, code),
+    outcome,
+    message: transaction.message ?? '',
+  };
 }
 
 export async function listMyOrders(userId: number, query: OrderListQuery) {
@@ -329,6 +446,18 @@ async function transitionOrderStatus(request: TransitionRequest) {
     );
   }
 
+  // Chưa có luồng hoàn tiền tự động: tiền đã trừ trên MoMo thì cửa hàng phải xử lý.
+  if (
+    request.actorType === 'CUSTOMER' &&
+    current.paymentMethod === 'MOMO' &&
+    current.paymentStatus === 'PAID'
+  ) {
+    throw AppError.conflict(
+      'ORDER_ALREADY_PAID',
+      'Đơn đã thanh toán qua MoMo nên không thể tự huỷ. Vui lòng liên hệ cửa hàng để được hỗ trợ hoàn tiền.',
+    );
+  }
+
   const allowed =
     request.actorType === 'CUSTOMER'
       ? CUSTOMER_TRANSITIONS[current.status]
@@ -357,7 +486,12 @@ async function transitionOrderStatus(request: TransitionRequest) {
 
   const transitioned = await prisma.$transaction(async (tx) => {
     const claimed = await tx.order.updateMany({
-      where: { id: current.id, status: current.status },
+      where: {
+        id: current.id,
+        status: current.status,
+        // Khách huỷ đua với IPN MoMo: chỉ huỷ khi tình trạng thanh toán chưa đổi.
+        ...(request.actorType === 'CUSTOMER' ? { paymentStatus: current.paymentStatus } : {}),
+      },
       data: {
         status: next,
         ...(next === 'DELIVERED' && current.paymentMethod === 'COD'

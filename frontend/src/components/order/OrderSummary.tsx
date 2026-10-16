@@ -95,7 +95,13 @@ export function OrderSummary({ order }: Readonly<OrderSummaryProps>) {
             </div>
             <div className="flex justify-between">
               <dt className="text-ink-muted">Tình trạng</dt>
-              <dd>{order.paymentStatus === 'PAID' ? 'Đã thanh toán' : 'Chưa thanh toán'}</dd>
+              <dd>
+                {order.paymentStatus === 'PAID'
+                  ? 'Đã thanh toán'
+                  : order.paymentStatus === 'FAILED'
+                    ? 'Thanh toán thất bại'
+                    : 'Chưa thanh toán'}
+              </dd>
             </div>
             <div className="flex justify-between border-t border-line pt-2 text-base font-semibold">
               <dt>Tổng cộng</dt>

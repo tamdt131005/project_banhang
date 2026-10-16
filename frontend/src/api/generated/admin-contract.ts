@@ -84,6 +84,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/orders/{code}/momo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Create a new MoMo payment attempt for the customer's own unpaid MOMO order (PENDING or CONFIRMED). 501 when MoMo is not configured; 502 when MoMo rejects or is unreachable. */
+        post: operations["startMomoPayment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/orders/{code}/momo/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Called by the MoMo return page. The server queries MoMo for the transaction instead of trusting redirect parameters, then updates paymentStatus (never downgrades PAID). */
+        post: operations["verifyMomoPayment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/payments/momo/ipn": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Server-to-server MoMo IPN. Authenticated only by the HMAC-SHA256 signature over the documented field order. */
+        post: operations["receiveMomoIpn"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/chat/conversations": {
         parameters: {
             query?: never;
@@ -1315,6 +1366,91 @@ export interface operations {
                     };
                 };
             };
+        };
+    };
+    startMomoPayment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description MoMo payment page URL */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uri */
+                        paymentUrl: string;
+                    };
+                };
+            };
+            409: components["responses"]["Error"];
+        };
+    };
+    verifyMomoPayment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    momoOrderId: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Current order and MoMo outcome */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        order: components["schemas"]["Order"];
+                        /** @enum {string} */
+                        outcome: "PAID" | "PENDING" | "FAILED" | "UNKNOWN";
+                        message: string;
+                    };
+                };
+            };
+            400: components["responses"]["Error"];
+        };
+    };
+    receiveMomoIpn: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description Notification accepted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["Error"];
         };
     };
     listAdminChatConversations: {

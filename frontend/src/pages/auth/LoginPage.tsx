@@ -51,7 +51,7 @@ export function LoginPage() {
     <AuthShell
       title="Chào mừng trở lại"
       subtitle="Đăng nhập để tiếp tục mua sắm hoặc vào khu làm việc của bạn."
-      imageSeed="tamdang-dang-nhap"
+      imageUrl="/images/auth-dang-nhap.webp"
     >
       <form onSubmit={handleSubmit} className="space-y-5">
         {message ? <Alert>{message}</Alert> : null}

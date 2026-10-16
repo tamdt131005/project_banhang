@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useLocation, useParams } from 'react-router-dom';
 import { orderApi } from '../../api/orders';
 import { CancelReasonForm, useCancelReason } from '../../components/order/CancelReasonForm';
 import { OrderStatusBadge } from '../../components/order/OrderStatusBadge';
@@ -9,7 +9,7 @@ import { OrderTimeline } from '../../components/order/OrderTimeline';
 import { Button } from '../../components/ui/Button';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { Alert, Skeleton } from '../../components/ui/Feedback';
-import { ArrowLeftIcon, XIcon } from '../../components/ui/icons';
+import { ArrowLeftIcon, WalletIcon, XIcon } from '../../components/ui/icons';
 import { errorMessage } from '../../lib/errors';
 import { formatDateTime } from '../../lib/format';
 import { CUSTOMER_CANCEL_REASONS, type CancelReasonPayload } from '../../lib/order-cancel';
@@ -19,6 +19,7 @@ export interface OrderDetailPageProps {}
 
 export function OrderDetailPage({}: Readonly<OrderDetailPageProps>) {
   const { code = '' } = useParams<{ code: string }>();
+  const location = useLocation() as { state: { paymentError?: unknown } | null };
   const queryClient = useQueryClient();
   const [confirming, setConfirming] = useState(false);
   const cancelReason = useCancelReason();
@@ -27,6 +28,11 @@ export function OrderDetailPage({}: Readonly<OrderDetailPageProps>) {
     queryKey: ['order', code],
     queryFn: () => orderApi.getMine(code).then((response) => response.order),
     enabled: code !== '',
+  });
+
+  const payMomo = useMutation({
+    mutationFn: () => orderApi.payMomo(code),
+    onSuccess: ({ paymentUrl }) => window.location.assign(paymentUrl),
   });
 
   const cancel = useMutation({
@@ -60,6 +66,14 @@ export function OrderDetailPage({}: Readonly<OrderDetailPageProps>) {
   }
 
   const data = order.data;
+  const paidOnline = data.paymentMethod === 'MOMO' && data.paymentStatus === 'PAID';
+  const canPayMomo =
+    data.paymentMethod === 'MOMO' &&
+    data.paymentStatus !== 'PAID' &&
+    (data.status === 'PENDING' || data.status === 'CONFIRMED');
+  // Lỗi mở cổng MoMo ngay lúc đặt hàng, do trang thanh toán chuyển sang.
+  const checkoutPaymentError =
+    canPayMomo && typeof location.state?.paymentError === 'string' ? location.state.paymentError : null;
 
   return (
     <div className="space-y-4">
@@ -79,8 +93,18 @@ export function OrderDetailPage({}: Readonly<OrderDetailPageProps>) {
 
         <div className="flex items-center gap-3">
           <OrderStatusBadge status={data.status} />
-          {/* Khách chỉ tự huỷ được khi shop chưa xác nhận; sau đó backend từ chối. */}
-          {data.status === 'PENDING' ? (
+          {canPayMomo ? (
+            <Button
+              size="sm"
+              loading={payMomo.isPending || payMomo.isSuccess}
+              onClick={() => payMomo.mutate()}
+            >
+              <WalletIcon className="size-3.5" />
+              {data.paymentStatus === 'FAILED' ? 'Thanh toán lại MoMo' : 'Thanh toán MoMo'}
+            </Button>
+          ) : null}
+          {/* Khách chỉ tự huỷ được khi shop chưa xác nhận và chưa trả tiền online; sau đó backend từ chối. */}
+          {data.status === 'PENDING' && !paidOnline ? (
             <Button
               variant="danger"
               size="sm"
@@ -97,6 +121,13 @@ export function OrderDetailPage({}: Readonly<OrderDetailPageProps>) {
       </div>
 
       {cancel.isError ? <Alert>{errorMessage(cancel.error)}</Alert> : null}
+      {payMomo.isError ? <Alert>{errorMessage(payMomo.error)}</Alert> : null}
+      {checkoutPaymentError && !payMomo.isError ? (
+        <Alert>
+          Đơn đã được tạo nhưng chưa mở được trang MoMo: {checkoutPaymentError} Bạn có thể thanh toán
+          lại hoặc huỷ đơn.
+        </Alert>
+      ) : null}
 
       {/* Lịch sử thật từ backend; component chỉ fallback về trạng thái hiện tại với payload cũ. */}
       <OrderTimeline status={data.status} statusHistory={data.statusHistory} />

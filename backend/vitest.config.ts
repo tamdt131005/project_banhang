@@ -9,6 +9,11 @@ export default defineConfig({
     env: {
       NODE_ENV: 'test',
       DATABASE_URL: process.env['TEST_DATABASE_URL'] ?? '',
+      // Khoá MoMo thật trong .env không được lọt vào test; test MoMo tự gán cấu hình giả.
+      MOMO_PARTNER_CODE: '',
+      MOMO_ACCESS_KEY: '',
+      MOMO_SECRET_KEY: '',
+      MOMO_ENDPOINT: '',
     },
     globalSetup: ['./tests/globalSetup.ts'],
     setupFiles: ['./tests/setup.ts'],

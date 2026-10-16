@@ -8,7 +8,7 @@ import { cartRouter } from './modules/cart/cart.routes.js';
 import { chatRouter } from './modules/chat/chat.routes.js';
 import { adminChatRouter } from './modules/chat/admin-chat.routes.js';
 import { adminCategoryRouter, categoryRouter } from './modules/categories/category.routes.js';
-import { adminOrderRouter, orderRouter } from './modules/orders/order.routes.js';
+import { adminOrderRouter, orderRouter, paymentRouter } from './modules/orders/order.routes.js';
 import {
   adminProductImageRouter,
   adminProductRouter,
@@ -42,6 +42,8 @@ apiRouter.use('/auth', authRouter);
 apiRouter.use('/banners', bannerRouter);
 apiRouter.use('/categories', categoryRouter);
 apiRouter.use('/products', productRouter);
+// IPN MoMo: xác thực bằng chữ ký HMAC thay cho phiên đăng nhập.
+apiRouter.use('/payments', paymentRouter);
 
 // -------------------------------------------------------------- cần đăng nhập
 apiRouter.use('/addresses', addressRouter);

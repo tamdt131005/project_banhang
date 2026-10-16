@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { type AddressInput, addressApi } from '../../api/addresses';
 import { catalogApi } from '../../api/catalog';
-import { orderApi } from '../../api/orders';
+import { type CreateOrderInput, orderApi } from '../../api/orders';
 import { AddressForm } from '../../components/address/AddressForm';
 import { Button } from '../../components/ui/Button';
 import { TextAreaField } from '../../components/ui/Field';
@@ -16,6 +16,15 @@ import { formatVnd } from '../../lib/format';
 
 /** Khớp mức mặc định SHIPPING_FEE của backend khi giỏ đang trống nên không có phí để đọc. */
 const DEFAULT_SHIPPING_FEE = 30_000;
+
+const PAYMENT_OPTIONS: { value: CreateOrderInput['paymentMethod']; label: string; hint: string }[] = [
+  { value: 'COD', label: 'Thanh toán khi nhận hàng (COD)', hint: 'Trả tiền mặt cho nhân viên giao hàng.' },
+  {
+    value: 'MOMO',
+    label: 'Ví MoMo / thẻ ATM / thẻ quốc tế',
+    hint: 'Chuyển sang trang MoMo để thanh toán ngay sau khi đặt hàng.',
+  },
+];
 
 /** Trang định tuyến không nhận prop; dữ liệu lấy từ URL và API. */
 export interface CheckoutPageProps {}
@@ -35,8 +44,10 @@ export function CheckoutPage({}: Readonly<CheckoutPageProps>) {
 
   const [addressId, setAddressId] = useState<number | null>(null);
   const [note, setNote] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<CreateOrderInput['paymentMethod']>('COD');
   const [adding, setAdding] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
+  const [redirecting, setRedirecting] = useState(false);
 
   const addresses = useQuery({
     queryKey: ['addresses'],
@@ -64,15 +75,26 @@ export function CheckoutPage({}: Readonly<CheckoutPageProps>) {
       if (addressId === null) throw new Error('Vui lòng chọn địa chỉ giao hàng.');
       return orderApi.create({
         addressId,
-        paymentMethod: 'COD',
+        paymentMethod,
         ...(note.trim() ? { note: note.trim() } : {}),
         ...(buyNow ? { buyNow: { variantId: buyNow.variantId, quantity: buyNow.quantity } } : {}),
       });
     },
-    onSuccess: ({ order }) => {
+    onSuccess: ({ order, paymentUrl, paymentError }) => {
       // Thanh toán giỏ thì backend dọn giỏ; mua ngay thì giỏ giữ nguyên. Cả hai đều làm danh sách đơn cũ.
       void queryClient.invalidateQueries({ queryKey: ['cart'] });
       void queryClient.invalidateQueries({ queryKey: ['orders'] });
+      if (paymentUrl) {
+        // Giữ nút ở trạng thái chờ trong lúc trình duyệt rời trang, tránh đặt trùng đơn.
+        setRedirecting(true);
+        window.location.assign(paymentUrl);
+        return;
+      }
+      // Đơn MoMo chưa mở được cổng thanh toán: trang chi tiết có nút thanh toán lại.
+      if (order.paymentMethod === 'MOMO') {
+        void navigate(`/don-hang/${order.code}`, { replace: true, state: { paymentError } });
+        return;
+      }
       void navigate(`/dat-hang-thanh-cong/${order.code}`, { replace: true });
     },
     onError: (error) => setFailure(errorMessage(error)),
@@ -265,14 +287,26 @@ export function CheckoutPage({}: Readonly<CheckoutPageProps>) {
               Phương thức thanh toán
             </h2>
 
-            <div className="rounded-control border border-accent bg-accent-soft p-3 text-sm">
-              <p className="font-medium text-accent">Thanh toán khi nhận hàng (COD)</p>
-              <p className="mt-0.5 text-ink-muted">Trả tiền mặt cho nhân viên giao hàng.</p>
-            </div>
-
-            <p className="mt-2 text-xs text-ink-muted">
-              Thanh toán MoMo chưa được đấu nối trong phiên bản này.
-            </p>
+            <ul className="space-y-2">
+              {PAYMENT_OPTIONS.map((option) => (
+                <li key={option.value}>
+                  <label className="flex cursor-pointer gap-3 rounded-control border border-line p-3 text-sm transition-colors duration-[160ms] hover:bg-sunken has-checked:border-accent has-checked:bg-accent-soft">
+                    <input
+                      type="radio"
+                      name="paymentMethod"
+                      value={option.value}
+                      checked={paymentMethod === option.value}
+                      onChange={() => setPaymentMethod(option.value)}
+                      className="mt-1 accent-accent"
+                    />
+                    <span>
+                      <span className="font-medium">{option.label}</span>
+                      <span className="mt-0.5 block text-ink-muted">{option.hint}</span>
+                    </span>
+                  </label>
+                </li>
+              ))}
+            </ul>
           </section>
 
           <section className="rounded-card border border-line bg-surface p-4">
@@ -333,7 +367,7 @@ export function CheckoutPage({}: Readonly<CheckoutPageProps>) {
 
           <Button
             className="mt-4 w-full"
-            loading={placeOrder.isPending}
+            loading={placeOrder.isPending || redirecting}
             disabled={
               addressId === null ||
               (buyNow ? !buyNowReady || outOfStock : Boolean(cart.data?.hasUnavailableItems))
@@ -343,7 +377,7 @@ export function CheckoutPage({}: Readonly<CheckoutPageProps>) {
               placeOrder.mutate();
             }}
           >
-            Đặt hàng
+            {paymentMethod === 'MOMO' ? 'Đặt hàng và thanh toán MoMo' : 'Đặt hàng'}
           </Button>
 
           {addressId === null ? (

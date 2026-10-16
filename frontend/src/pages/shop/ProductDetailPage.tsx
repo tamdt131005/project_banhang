@@ -81,8 +81,8 @@ export function ProductDetailPage({}: Readonly<ProductDetailPageProps>) {
 
   if (productQuery.isPending) {
     return (
-      <div className="grid gap-6 md:grid-cols-2">
-        <Skeleton className="aspect-[4/5]" />
+      <div className="grid gap-6 md:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]">
+        <Skeleton className="aspect-[4/5] w-full max-w-[26rem]" />
         <div className="space-y-3">
           <Skeleton className="h-7 w-3/4" />
           <Skeleton className="h-9 w-1/3" />
@@ -193,9 +193,9 @@ export function ProductDetailPage({}: Readonly<ProductDetailPageProps>) {
         </Link>
       </nav>
 
-      <div className="grid gap-6 md:grid-cols-2">
-        <div>
-          {/* Khung dọc 4:5 đồng bộ với thẻ lưới — ảnh quần áo chụp dáng đứng. */}
+      <div className="grid items-start gap-6 md:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]">
+        <div className="mx-auto w-full max-w-[26rem] md:mx-0">
+          {/* Khung dọc 4:5 đồng bộ với thẻ lưới — giới hạn rộng để ảnh không chiếm nửa trang. */}
           <div className="aspect-[4/5] overflow-hidden rounded-card border border-line bg-sunken">
             {image ? (
               <img

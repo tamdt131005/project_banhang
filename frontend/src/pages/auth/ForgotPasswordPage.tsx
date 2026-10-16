@@ -83,7 +83,7 @@ export function ForgotPasswordPage() {
       subtitle={complete
         ? 'Bạn có thể đăng nhập bằng mật khẩu mới.'
         : 'Nhập email để nhận mã xác nhận và tạo mật khẩu mới.'}
-      imageSeed="tamdang-quen-mat-khau"
+      imageUrl="/images/auth-quen-mat-khau.webp"
     >
       {message ? <div className="mb-4"><Alert tone={messageTone}>{message}</Alert></div> : null}
 

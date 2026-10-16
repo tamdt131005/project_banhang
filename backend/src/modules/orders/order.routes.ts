@@ -10,6 +10,9 @@ import {
   createHandler,
   detailMineHandler,
   listMineHandler,
+  momoIpnHandler,
+  momoPayHandler,
+  momoVerifyHandler,
 } from './order.controller.js';
 
 /** /api/orders — đơn của chính người đang đăng nhập. */
@@ -20,6 +23,12 @@ orderRouter.get('/', listMineHandler);
 orderRouter.post('/', orderLimiter, createHandler);
 orderRouter.get('/:code', detailMineHandler);
 orderRouter.post('/:code/cancel', cancelHandler);
+orderRouter.post('/:code/momo', momoPayHandler);
+orderRouter.post('/:code/momo/verify', momoVerifyHandler);
+
+/** /api/payments — cổng thanh toán gọi về, không có phiên đăng nhập. */
+export const paymentRouter = Router();
+paymentRouter.post('/momo/ipn', momoIpnHandler);
 
 /** /api/admin/orders */
 export const adminOrderRouter = Router();

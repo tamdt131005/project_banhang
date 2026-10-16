@@ -57,7 +57,15 @@ const envSchema = z
     MOMO_PARTNER_CODE: z.string().default(''),
     MOMO_ACCESS_KEY: z.string().default(''),
     MOMO_SECRET_KEY: z.string().default(''),
+    /** Gốc API, không kèm đường dẫn. Sandbox: https://test-payment.momo.vn */
     MOMO_ENDPOINT: z.string().default(''),
+    /** Trang frontend nhận khách quay về sau khi thanh toán trên MoMo. */
+    MOMO_REDIRECT_URL: z.string().url().default('http://localhost:5173/thanh-toan/momo/ket-qua'),
+    /**
+     * Địa chỉ công khai MoMo gọi IPN. Để localhost thì MoMo không gọi tới được;
+     * khi đó trang kết quả tự tra cứu giao dịch nên luồng vẫn chạy.
+     */
+    MOMO_IPN_URL: z.string().url().default('http://localhost:4000/api/payments/momo/ipn'),
   });
 
 const parsed = envSchema.safeParse(process.env);

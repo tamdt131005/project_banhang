@@ -145,6 +145,34 @@ export const orderCodeParamSchema = z.object({
   code: z.string().trim().min(3).max(32),
 });
 
+/** orderId MoMo trả về trên URL redirect; định dạng theo regex của MoMo. */
+export const momoVerifySchema = z.object({
+  momoOrderId: z
+    .string()
+    .trim()
+    .max(200)
+    .regex(/^[0-9a-zA-Z]([-_.]*[0-9a-zA-Z]+)*$/, 'Mã giao dịch MoMo không hợp lệ'),
+});
+
+/** MoMo gửi số hoặc chuỗi; giữ dạng chuỗi để dựng lại đúng chuỗi ký. */
+const momoField = z.union([z.string(), z.number()]).transform(String);
+
+export const momoIpnSchema = z.object({
+  partnerCode: z.string(),
+  orderId: z.string().max(200),
+  requestId: momoField,
+  amount: momoField,
+  orderInfo: z.string().default(''),
+  orderType: z.string().default(''),
+  transId: momoField,
+  resultCode: momoField,
+  message: z.string().default(''),
+  payType: z.string().default(''),
+  responseTime: momoField,
+  extraData: z.string().default(''),
+  signature: z.string(),
+});
+
 export type OrderCreateInput = z.infer<typeof orderCreateSchema>;
 export type OrderListQuery = z.infer<typeof orderListQuerySchema>;
 export type AdminOrderListQuery = z.infer<typeof adminOrderListQuerySchema>;
