@@ -25,6 +25,7 @@ import { CartPage } from './pages/shop/CartPage';
 import { CheckoutPage } from './pages/shop/CheckoutPage';
 import { HomePage } from './pages/shop/HomePage';
 import { MomoResultPage } from './pages/shop/MomoResultPage';
+import { VnpayResultPage } from './pages/shop/VnpayResultPage';
 import { MyOrdersPage } from './pages/shop/MyOrdersPage';
 import { OrderDetailPage } from './pages/shop/OrderDetailPage';
 import { OrderSuccessPage } from './pages/shop/OrderSuccessPage';
@@ -58,6 +59,7 @@ export default function App({}: Readonly<AppProps>) {
           <Route path="thanh-toan" element={<CheckoutPage />} />
           <Route path="dat-hang-thanh-cong/:code" element={<OrderSuccessPage />} />
           <Route path="thanh-toan/momo/ket-qua" element={<MomoResultPage />} />
+          <Route path="thanh-toan/vnpay/ket-qua" element={<VnpayResultPage />} />
           <Route path="don-hang/:code" element={<OrderDetailPage />} />
 
           {/* Khu tài khoản dùng chung sidebar: hồ sơ / sổ địa chỉ / đơn mua. */}

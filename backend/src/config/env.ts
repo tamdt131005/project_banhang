@@ -66,6 +66,19 @@ const envSchema = z
      * khi đó trang kết quả tự tra cứu giao dịch nên luồng vẫn chạy.
      */
     MOMO_IPN_URL: z.string().url().default('http://localhost:4000/api/payments/momo/ipn'),
+
+    VNPAY_TMN_CODE: z.string().default(''),
+    VNPAY_HASH_SECRET: z.string().default(''),
+    /** Trang thanh toán của VNPAY. Production: https://pay.vnpay.vn/vpcpay.html */
+    VNPAY_PAYMENT_URL: z
+      .string()
+      .url()
+      .default('https://sandbox.vnpayment.vn/paymentv2/vpcpay.html'),
+    /**
+     * Trang frontend nhận khách quay về. IPN URL không gửi kèm request mà khai
+     * báo với VNPAY: <backend>/api/payments/vnpay/ipn.
+     */
+    VNPAY_RETURN_URL: z.string().url().default('http://localhost:5173/thanh-toan/vnpay/ket-qua'),
   });
 
 const parsed = envSchema.safeParse(process.env);

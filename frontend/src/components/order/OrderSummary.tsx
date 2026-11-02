@@ -6,6 +6,12 @@ export interface OrderSummaryProps {
   order: ApiOrder;
 }
 
+const PAYMENT_METHOD_LABEL: Record<ApiOrder['paymentMethod'], string> = {
+  COD: 'Khi nhận hàng',
+  MOMO: 'MoMo',
+  VNPAY: 'VNPAY',
+};
+
 /** Dùng chung cho trang chi tiết đơn của khách và của quản trị viên. */
 export function OrderSummary({ order }: Readonly<OrderSummaryProps>) {
   return (
@@ -91,7 +97,7 @@ export function OrderSummary({ order }: Readonly<OrderSummaryProps>) {
             </div>
             <div className="flex justify-between">
               <dt className="text-ink-muted">Hình thức</dt>
-              <dd>{order.paymentMethod === 'COD' ? 'Khi nhận hàng' : 'MoMo'}</dd>
+              <dd>{PAYMENT_METHOD_LABEL[order.paymentMethod]}</dd>
             </div>
             <div className="flex justify-between">
               <dt className="text-ink-muted">Tình trạng</dt>

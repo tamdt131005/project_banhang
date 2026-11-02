@@ -4,6 +4,8 @@ export interface PaymentOrderInfo {
   code: string;
   total: number;
   description: string;
+  /** IP của khách; VNPAY bắt buộc gửi kèm (vnp_IpAddr). */
+  clientIp?: string;
 }
 
 export interface PaymentInitResult {

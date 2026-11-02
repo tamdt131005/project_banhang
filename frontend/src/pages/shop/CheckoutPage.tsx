@@ -24,7 +24,18 @@ const PAYMENT_OPTIONS: { value: CreateOrderInput['paymentMethod']; label: string
     label: 'Ví MoMo / thẻ ATM / thẻ quốc tế',
     hint: 'Chuyển sang trang MoMo để thanh toán ngay sau khi đặt hàng.',
   },
+  {
+    value: 'VNPAY',
+    label: 'VNPAY: thẻ ATM / QR ngân hàng / thẻ quốc tế',
+    hint: 'Chuyển sang cổng VNPAY để thanh toán ngay sau khi đặt hàng.',
+  },
 ];
+
+const PAY_BUTTON_LABEL: Record<CreateOrderInput['paymentMethod'], string> = {
+  COD: 'Đặt hàng',
+  MOMO: 'Đặt hàng và thanh toán MoMo',
+  VNPAY: 'Đặt hàng và thanh toán VNPAY',
+};
 
 /** Trang định tuyến không nhận prop; dữ liệu lấy từ URL và API. */
 export interface CheckoutPageProps {}
@@ -90,8 +101,8 @@ export function CheckoutPage({}: Readonly<CheckoutPageProps>) {
         window.location.assign(paymentUrl);
         return;
       }
-      // Đơn MoMo chưa mở được cổng thanh toán: trang chi tiết có nút thanh toán lại.
-      if (order.paymentMethod === 'MOMO') {
+      // Đơn online chưa mở được cổng thanh toán: trang chi tiết có nút thanh toán lại.
+      if (order.paymentMethod !== 'COD') {
         void navigate(`/don-hang/${order.code}`, { replace: true, state: { paymentError } });
         return;
       }
@@ -377,7 +388,7 @@ export function CheckoutPage({}: Readonly<CheckoutPageProps>) {
               placeOrder.mutate();
             }}
           >
-            {paymentMethod === 'MOMO' ? 'Đặt hàng và thanh toán MoMo' : 'Đặt hàng'}
+            {PAY_BUTTON_LABEL[paymentMethod]}
           </Button>
 
           {addressId === null ? (

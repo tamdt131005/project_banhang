@@ -162,7 +162,7 @@ export interface ApiOrder {
   id: number;
   code: string;
   status: OrderStatus;
-  paymentMethod: 'COD' | 'MOMO';
+  paymentMethod: 'COD' | 'MOMO' | 'VNPAY';
   paymentStatus: 'UNPAID' | 'PAID' | 'FAILED';
   subtotal: number;
   shippingFee: number;

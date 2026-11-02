@@ -61,6 +61,7 @@ enum OrderStatus {
 enum PaymentMethod {
   COD
   MOMO
+  VNPAY
 }
 
 enum PaymentStatus {

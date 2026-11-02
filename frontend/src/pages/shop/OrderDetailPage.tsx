@@ -30,8 +30,9 @@ export function OrderDetailPage({}: Readonly<OrderDetailPageProps>) {
     enabled: code !== '',
   });
 
-  const payMomo = useMutation({
-    mutationFn: () => orderApi.payMomo(code),
+  const payOnline = useMutation({
+    mutationFn: (method: 'MOMO' | 'VNPAY') =>
+      method === 'MOMO' ? orderApi.payMomo(code) : orderApi.payVnpay(code),
     onSuccess: ({ paymentUrl }) => window.location.assign(paymentUrl),
   });
 
@@ -66,14 +67,16 @@ export function OrderDetailPage({}: Readonly<OrderDetailPageProps>) {
   }
 
   const data = order.data;
-  const paidOnline = data.paymentMethod === 'MOMO' && data.paymentStatus === 'PAID';
-  const canPayMomo =
-    data.paymentMethod === 'MOMO' &&
+  const onlineMethod = data.paymentMethod === 'COD' ? null : data.paymentMethod;
+  const gatewayName = onlineMethod === 'VNPAY' ? 'VNPAY' : 'MoMo';
+  const paidOnline = onlineMethod !== null && data.paymentStatus === 'PAID';
+  const canPayOnline =
+    onlineMethod !== null &&
     data.paymentStatus !== 'PAID' &&
     (data.status === 'PENDING' || data.status === 'CONFIRMED');
-  // Lỗi mở cổng MoMo ngay lúc đặt hàng, do trang thanh toán chuyển sang.
+  // Lỗi mở cổng thanh toán ngay lúc đặt hàng, do trang thanh toán chuyển sang.
   const checkoutPaymentError =
-    canPayMomo && typeof location.state?.paymentError === 'string' ? location.state.paymentError : null;
+    canPayOnline && typeof location.state?.paymentError === 'string' ? location.state.paymentError : null;
 
   return (
     <div className="space-y-4">
@@ -93,14 +96,14 @@ export function OrderDetailPage({}: Readonly<OrderDetailPageProps>) {
 
         <div className="flex items-center gap-3">
           <OrderStatusBadge status={data.status} />
-          {canPayMomo ? (
+          {canPayOnline && onlineMethod ? (
             <Button
               size="sm"
-              loading={payMomo.isPending || payMomo.isSuccess}
-              onClick={() => payMomo.mutate()}
+              loading={payOnline.isPending || payOnline.isSuccess}
+              onClick={() => payOnline.mutate(onlineMethod)}
             >
               <WalletIcon className="size-3.5" />
-              {data.paymentStatus === 'FAILED' ? 'Thanh toán lại MoMo' : 'Thanh toán MoMo'}
+              {data.paymentStatus === 'FAILED' ? `Thanh toán lại ${gatewayName}` : `Thanh toán ${gatewayName}`}
             </Button>
           ) : null}
           {/* Khách chỉ tự huỷ được khi shop chưa xác nhận và chưa trả tiền online; sau đó backend từ chối. */}
@@ -121,11 +124,11 @@ export function OrderDetailPage({}: Readonly<OrderDetailPageProps>) {
       </div>
 
       {cancel.isError ? <Alert>{errorMessage(cancel.error)}</Alert> : null}
-      {payMomo.isError ? <Alert>{errorMessage(payMomo.error)}</Alert> : null}
-      {checkoutPaymentError && !payMomo.isError ? (
+      {payOnline.isError ? <Alert>{errorMessage(payOnline.error)}</Alert> : null}
+      {checkoutPaymentError && !payOnline.isError ? (
         <Alert>
-          Đơn đã được tạo nhưng chưa mở được trang MoMo: {checkoutPaymentError} Bạn có thể thanh toán
-          lại hoặc huỷ đơn.
+          Đơn đã được tạo nhưng chưa mở được trang {gatewayName}: {checkoutPaymentError} Bạn có thể thanh
+          toán lại hoặc huỷ đơn.
         </Alert>
       ) : null}
 

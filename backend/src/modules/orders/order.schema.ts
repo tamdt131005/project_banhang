@@ -20,7 +20,7 @@ const buyNowSchema = z.object({
 
 export const orderCreateSchema = z.object({
   addressId: z.coerce.number().int().positive('Vui lòng chọn địa chỉ giao hàng'),
-  paymentMethod: z.enum(['COD', 'MOMO']).default('COD'),
+  paymentMethod: z.enum(['COD', 'MOMO', 'VNPAY']).default('COD'),
   note: z.string().trim().max(500, 'Ghi chú quá dài').optional(),
   buyNow: buyNowSchema.optional(),
 });
@@ -40,7 +40,7 @@ export const adminOrderListQuerySchema = orderListQuerySchema.extend({
   /** Tìm theo mã đơn, tên hoặc email người mua. */
   search: z.string().trim().max(191).optional(),
   paymentStatus: z.enum(['UNPAID', 'PAID', 'FAILED']).optional(),
-  paymentMethod: z.enum(['COD', 'MOMO']).optional(),
+  paymentMethod: z.enum(['COD', 'MOMO', 'VNPAY']).optional(),
   /** Khoảng ngày đặt, dạng YYYY-MM-DD. */
   from: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, 'Ngày không hợp lệ').optional(),
   to: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, 'Ngày không hợp lệ').optional(),
@@ -171,6 +171,11 @@ export const momoIpnSchema = z.object({
   responseTime: momoField,
   extraData: z.string().default(''),
   signature: z.string(),
+});
+
+/** Nguyên các tham số vnp_ trên URL VNPAY chuyển khách về; backend tự kiểm chữ ký. */
+export const vnpayVerifySchema = z.object({
+  params: z.record(z.string().regex(/^vnp_[A-Za-z]+$/).max(40), z.string().max(512)),
 });
 
 export type OrderCreateInput = z.infer<typeof orderCreateSchema>;

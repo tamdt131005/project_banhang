@@ -14,6 +14,9 @@ export default defineConfig({
       MOMO_ACCESS_KEY: '',
       MOMO_SECRET_KEY: '',
       MOMO_ENDPOINT: '',
+      // Tương tự với VNPAY; test VNPAY tự gán khoá giả.
+      VNPAY_TMN_CODE: '',
+      VNPAY_HASH_SECRET: '',
     },
     globalSetup: ['./tests/globalSetup.ts'],
     setupFiles: ['./tests/setup.ts'],

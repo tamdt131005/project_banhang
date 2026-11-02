@@ -15,6 +15,14 @@ import {
   orderCodeFromMomoOrderId,
   queryMomoTransaction,
 } from '../../payments/momo.js';
+import {
+  type VnpayOutcome,
+  type VnpayResult,
+  orderCodeFromTxnRef,
+  verifyVnpayParams,
+  vnpayMessage,
+  vnpayOutcome,
+} from '../../payments/vnpay.js';
 import { reserveOrderItem, restoreOrderInventory } from '../inventory/inventory.service.js';
 import type { AdminOrderListQuery, OrderCreateInput, OrderListQuery } from './order.schema.js';
 
@@ -80,7 +88,7 @@ function buildOrderCode(id: number, createdAt: Date): string {
   return `DH${yyyymmdd}-${String(id).padStart(5, '0')}`;
 }
 
-export async function createOrder(userId: number, input: OrderCreateInput) {
+export async function createOrder(userId: number, input: OrderCreateInput, clientIp?: string) {
   const provider = getPaymentProvider(input.paymentMethod);
 
   // Kiểm tra trước khi chạm database. Nếu để tới giữa transaction mới phát
@@ -241,7 +249,7 @@ export async function createOrder(userId: number, input: OrderCreateInput) {
   // hàng loạt dòng sản phẩm suốt thời gian đó.
   let payment: PaymentInitResult;
   try {
-    payment = await provider.initiate(paymentInfoOf(order));
+    payment = await provider.initiate(paymentInfoOf(order, clientIp));
   } catch (error) {
     // Đơn và phần giữ hàng đã ghi xong nên không được báo lỗi như thể chưa đặt:
     // trả đơn về để khách thanh toán lại hoặc tự huỷ ở trang chi tiết đơn.
@@ -261,16 +269,17 @@ export async function createOrder(userId: number, input: OrderCreateInput) {
   return { order: result, paymentUrl: payment.redirectUrl };
 }
 
-function paymentInfoOf(order: { code: string; total: number }): PaymentOrderInfo {
+function paymentInfoOf(order: { code: string; total: number }, clientIp?: string): PaymentOrderInfo {
   return {
     code: order.code,
     total: order.total,
     description: `Thanh toan don hang ${order.code}`,
+    clientIp,
   };
 }
 
-/** Đơn MoMo còn chờ xử lý hoặc đã xác nhận thì khách vẫn thanh toán (lại) được. */
-const MOMO_PAYABLE_STATUSES: OrderStatus[] = ['PENDING', 'CONFIRMED'];
+/** Đơn thanh toán online còn chờ xử lý hoặc đã xác nhận thì khách vẫn thanh toán (lại) được. */
+const ONLINE_PAYABLE_STATUSES: OrderStatus[] = ['PENDING', 'CONFIRMED'];
 
 export async function startMomoPayment(userId: number, code: string) {
   const order = await getMyOrder(userId, code);
@@ -281,7 +290,7 @@ export async function startMomoPayment(userId: number, code: string) {
   if (order.paymentStatus === 'PAID') {
     throw AppError.conflict('ORDER_ALREADY_PAID', 'Đơn hàng đã được thanh toán.');
   }
-  if (!MOMO_PAYABLE_STATUSES.includes(order.status)) {
+  if (!ONLINE_PAYABLE_STATUSES.includes(order.status)) {
     throw AppError.conflict(
       'ORDER_NOT_PAYABLE',
       `Đơn hàng ${STATUS_LABEL[order.status]} nên không thể thanh toán.`,
@@ -359,6 +368,99 @@ export async function verifyMomoPayment(userId: number, code: string, momoOrderI
     order: await getMyOrder(userId, code),
     outcome,
     message: transaction.message ?? '',
+  };
+}
+
+export async function startVnpayPayment(userId: number, code: string, clientIp?: string) {
+  const order = await getMyOrder(userId, code);
+
+  if (order.paymentMethod !== 'VNPAY') {
+    throw AppError.conflict('PAYMENT_METHOD_MISMATCH', 'Đơn hàng này không thanh toán qua VNPAY.');
+  }
+  if (order.paymentStatus === 'PAID') {
+    throw AppError.conflict('ORDER_ALREADY_PAID', 'Đơn hàng đã được thanh toán.');
+  }
+  if (!ONLINE_PAYABLE_STATUSES.includes(order.status)) {
+    throw AppError.conflict(
+      'ORDER_NOT_PAYABLE',
+      `Đơn hàng ${STATUS_LABEL[order.status]} nên không thể thanh toán.`,
+    );
+  }
+
+  const payment = await getPaymentProvider('VNPAY').initiate(paymentInfoOf(order, clientIp));
+  return { paymentUrl: payment.redirectUrl };
+}
+
+/** Kết quả ghi nhận, khớp các mã RspCode IPN phải trả cho VNPAY. */
+export type VnpayApplyStatus = 'CONFIRMED' | 'ALREADY_CONFIRMED' | 'ORDER_NOT_FOUND' | 'INVALID_AMOUNT';
+
+/**
+ * Ghi nhận kết quả VNPAY đã đúng chữ ký (IPN hoặc trang kết quả). Hai đường có
+ * thể tới cùng lúc nên cập nhật có điều kiện như MoMo: không hạ PAID xuống,
+ * không đánh dấu PAID cho đơn đã huỷ.
+ */
+export async function applyVnpayResult(
+  result: VnpayResult,
+): Promise<{ outcome: VnpayOutcome; status: VnpayApplyStatus }> {
+  const outcome = vnpayOutcome(result.responseCode, result.transactionStatus);
+  const order = await prisma.order.findUnique({
+    where: { code: orderCodeFromTxnRef(result.txnRef) },
+  });
+  if (!order || order.paymentMethod !== 'VNPAY' || result.tmnCode !== env.VNPAY_TMN_CODE) {
+    return { outcome, status: 'ORDER_NOT_FOUND' };
+  }
+  if (result.amount !== order.total) {
+    console.error(`[vnpay] giao dịch ${result.txnRef} lệch số tiền với đơn ${order.code}; bỏ qua.`);
+    return { outcome, status: 'INVALID_AMOUNT' };
+  }
+  if (order.paymentStatus === 'PAID') return { outcome, status: 'ALREADY_CONFIRMED' };
+
+  if (outcome === 'PAID') {
+    const claimed = await prisma.order.updateMany({
+      where: { id: order.id, paymentStatus: { not: 'PAID' }, status: { not: 'CANCELLED' } },
+      data: { paymentStatus: 'PAID' },
+    });
+    if (claimed.count === 0 && order.status === 'CANCELLED') {
+      console.error(
+        `[vnpay] đơn ${order.code} đã huỷ nhưng giao dịch ${result.txnRef} thanh toán thành công; cần hoàn tiền thủ công.`,
+      );
+    }
+  } else if (outcome === 'FAILED') {
+    await prisma.order.updateMany({
+      where: { id: order.id, paymentStatus: 'UNPAID' },
+      data: { paymentStatus: 'FAILED' },
+    });
+  }
+
+  return { outcome, status: 'CONFIRMED' };
+}
+
+/** Trang kết quả gửi lại nguyên tham số VNPAY trên URL; chỉ tin khi đúng chữ ký. */
+export async function verifyVnpayReturn(userId: number, code: string, params: Record<string, string>) {
+  if (!getPaymentProvider('VNPAY').implemented) {
+    throw new AppError(501, 'PAYMENT_NOT_IMPLEMENTED', 'Thanh toán VNPAY chưa được cấu hình.');
+  }
+  const result = verifyVnpayParams(params);
+  if (!result) {
+    throw AppError.badRequest('INVALID_SIGNATURE', 'Chữ ký VNPAY không hợp lệ.');
+  }
+  if (orderCodeFromTxnRef(result.txnRef) !== code) {
+    throw AppError.badRequest('VNPAY_ORDER_MISMATCH', 'Giao dịch VNPAY không thuộc đơn hàng này.');
+  }
+
+  const order = await getMyOrder(userId, code);
+  if (order.paymentMethod !== 'VNPAY') {
+    throw AppError.conflict('PAYMENT_METHOD_MISMATCH', 'Đơn hàng này không thanh toán qua VNPAY.');
+  }
+
+  const { outcome, status } = await applyVnpayResult(result);
+  if (status === 'ORDER_NOT_FOUND' || status === 'INVALID_AMOUNT') {
+    throw AppError.badRequest('VNPAY_ORDER_MISMATCH', 'Giao dịch VNPAY không khớp với đơn hàng này.');
+  }
+  return {
+    order: await getMyOrder(userId, code),
+    outcome,
+    message: vnpayMessage(result.responseCode),
   };
 }
 
@@ -446,15 +548,15 @@ async function transitionOrderStatus(request: TransitionRequest) {
     );
   }
 
-  // Chưa có luồng hoàn tiền tự động: tiền đã trừ trên MoMo thì cửa hàng phải xử lý.
+  // Chưa có luồng hoàn tiền tự động: tiền đã trừ qua cổng online thì cửa hàng phải xử lý.
   if (
     request.actorType === 'CUSTOMER' &&
-    current.paymentMethod === 'MOMO' &&
+    current.paymentMethod !== 'COD' &&
     current.paymentStatus === 'PAID'
   ) {
     throw AppError.conflict(
       'ORDER_ALREADY_PAID',
-      'Đơn đã thanh toán qua MoMo nên không thể tự huỷ. Vui lòng liên hệ cửa hàng để được hỗ trợ hoàn tiền.',
+      `Đơn đã thanh toán qua ${current.paymentMethod === 'MOMO' ? 'MoMo' : 'VNPAY'} nên không thể tự huỷ. Vui lòng liên hệ cửa hàng để được hỗ trợ hoàn tiền.`,
     );
   }
 

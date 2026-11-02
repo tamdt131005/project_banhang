@@ -13,6 +13,9 @@ import {
   momoIpnHandler,
   momoPayHandler,
   momoVerifyHandler,
+  vnpayIpnHandler,
+  vnpayPayHandler,
+  vnpayVerifyHandler,
 } from './order.controller.js';
 
 /** /api/orders — đơn của chính người đang đăng nhập. */
@@ -25,10 +28,13 @@ orderRouter.get('/:code', detailMineHandler);
 orderRouter.post('/:code/cancel', cancelHandler);
 orderRouter.post('/:code/momo', momoPayHandler);
 orderRouter.post('/:code/momo/verify', momoVerifyHandler);
+orderRouter.post('/:code/vnpay', vnpayPayHandler);
+orderRouter.post('/:code/vnpay/verify', vnpayVerifyHandler);
 
 /** /api/payments — cổng thanh toán gọi về, không có phiên đăng nhập. */
 export const paymentRouter = Router();
 paymentRouter.post('/momo/ipn', momoIpnHandler);
+paymentRouter.get('/vnpay/ipn', vnpayIpnHandler);
 
 /** /api/admin/orders */
 export const adminOrderRouter = Router();
