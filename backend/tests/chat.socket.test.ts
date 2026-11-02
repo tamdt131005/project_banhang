@@ -2,6 +2,7 @@ import { createServer } from 'node:http';
 import request from 'supertest';
 import { afterEach, describe, expect, test } from 'vitest';
 import { createApp } from '../src/app.js';
+import { prisma } from '../src/lib/prisma.js';
 import { attachChatSocket } from '../src/modules/chat/chat.socket.js';
 import { createUser } from './helpers.js';
 
@@ -194,5 +195,54 @@ describe('chat socket public seam', () => {
     );
     await customerAgent.post(`/api/chat/conversations/${mine.id}/request-admin`).expect(200);
     await expect(supportEvent).resolves.toMatchObject({ conversation: { id: mine.id } });
+  });
+
+  test('only SUPPORT staff and admins join other customers rooms, like the REST API', async () => {
+    const app = createApp();
+    const httpServer = createServer(app);
+    const io = attachChatSocket(httpServer);
+    servers.push(io);
+    await new Promise<void>((resolve) => httpServer.listen(0, '127.0.0.1', resolve));
+    const address = httpServer.address();
+    if (!address || typeof address === 'string') throw new Error('HTTP server did not bind');
+    const url = `http://127.0.0.1:${address.port}`;
+
+    const password = 'Socket@12345';
+    await createUser({ email: 'room-customer@test.local', password });
+    const admin = await createUser({ email: 'room-admin@test.local', password, role: 'ADMIN' });
+    const staffWith = async (email: string, permission: 'CATALOG' | 'SUPPORT') => {
+      await createUser({ email, password });
+      await prisma.user.update({
+        where: { email },
+        data: {
+          role: 'STAFF',
+          staffPermissions: { create: { permission, grantedBy: { connect: { id: admin.id } } } },
+        },
+      });
+    };
+    await staffWith('room-catalog@test.local', 'CATALOG');
+    await staffWith('room-support@test.local', 'SUPPORT');
+
+    const customerAgent = request.agent(app);
+    await customerAgent
+      .post('/api/auth/login')
+      .send({ email: 'room-customer@test.local', password })
+      .expect(200);
+    const conversation = (await customerAgent.post('/api/chat/conversations').expect(201)).body
+      .conversation;
+
+    const joinAs = async (email: string) => {
+      const login = await request(app).post('/api/auth/login').send({ email, password }).expect(200);
+      const socket = await openPolling(url, accessCookie(login.headers['set-cookie'] as unknown as string[]));
+      expect((await socket.connectPacket()).startsWith('40')).toBe(true);
+      return socket.emitWithAck('conversation:join', { conversationId: conversation.id }, 0);
+    };
+
+    await expect(joinAs('room-catalog@test.local')).resolves.toMatchObject({
+      ok: false,
+      error: { code: 'FORBIDDEN' },
+    });
+    await expect(joinAs('room-support@test.local')).resolves.toEqual({ ok: true });
+    await expect(joinAs('room-admin@test.local')).resolves.toEqual({ ok: true });
   });
 });

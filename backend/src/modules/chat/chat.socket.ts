@@ -9,7 +9,7 @@ import { prisma } from '../../lib/prisma.js';
 import { AppError } from '../../middleware/error.js';
 import { messageMetadataKind, STAFF_NOTE_KIND } from './chat.constants.js';
 import { chatEvents } from './chat.events.js';
-import { hasAdminAccess, userHasPermission } from '../permissions/permission.service.js';
+import { userHasPermission } from '../permissions/permission.service.js';
 
 interface ChatSocketData {
   user: { id: number; email: string; role: Role };
@@ -72,8 +72,12 @@ export function attachChatSocket(httpServer: HttpServer) {
           select: { userId: true },
         });
         if (!conversation) throw AppError.notFound('Không tìm thấy cuộc trò chuyện này.');
-        const isStaff = await userHasPermission(socket.data.user.id, 'SUPPORT');
-        if (!(await hasAdminAccess(socket.data.user.id)) && conversation.userId !== socket.data.user.id && !isStaff) {
+        // Cùng điều kiện với REST /api/admin/chat: ngoài chủ hội thoại chỉ người có quyền SUPPORT
+        // (ADMIN luôn có) được nghe phòng. Nhân viên chỉ có quyền khác như CATALOG thì không.
+        if (
+          conversation.userId !== socket.data.user.id &&
+          !(await userHasPermission(socket.data.user.id, 'SUPPORT'))
+        ) {
           throw AppError.forbidden();
         }
         await socket.join(`conversation:${conversationId}`);

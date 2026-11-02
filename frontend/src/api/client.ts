@@ -48,9 +48,12 @@ async function send<T>(path: string, init: RequestInit, allowRetry: boolean): Pr
     },
   });
 
-  // Không thử làm mới cho chính các endpoint auth: /login trả 401 khi sai mật
-  // khẩu, gọi /refresh lúc đó vừa vô nghĩa vừa che mất lỗi thật.
-  if (response.status === 401 && allowRetry && !path.startsWith('/api/auth/')) {
+  // Không thử làm mới cho các endpoint đăng nhập/đăng ký/OTP/refresh: /login trả
+  // 401 khi sai mật khẩu, gọi /refresh lúc đó vừa vô nghĩa vừa che mất lỗi thật.
+  // Riêng /api/auth/me* là endpoint cần phiên như mọi API khác: access token 15
+  // phút hết hạn thì phải làm mới, nếu không tải lại trang sẽ trông như bị đăng xuất.
+  const canRefresh = !path.startsWith('/api/auth/') || path.startsWith('/api/auth/me');
+  if (response.status === 401 && allowRetry && canRefresh) {
     if (await refreshSession()) {
       return send<T>(path, init, false);
     }
