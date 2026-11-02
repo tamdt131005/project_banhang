@@ -26,9 +26,10 @@ export function ProtectedRoute({ redirectTo = '/dang-nhap' }: Readonly<GuardProp
   if (isLoading) return <Loading />;
 
   // `replace` để nút Quay lại của trình duyệt không ném người dùng trở lại
-  // đúng trang vừa bị chặn.
+  // đúng trang vừa bị chặn. Giữ cả query: trang kết quả MoMo/VNPAY cần
+  // nguyên tham số giao dịch trên URL sau khi khách đăng nhập lại.
   if (!user) {
-    return <Navigate to={redirectTo} replace state={{ from: location.pathname }} />;
+    return <Navigate to={redirectTo} replace state={{ from: location.pathname + location.search }} />;
   }
 
   return <Outlet />;
